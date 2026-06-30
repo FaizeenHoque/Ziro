@@ -30,9 +30,12 @@ pub struct App {
 
     exit: bool,
     pub mode: Mode,
+    pub status_text: String,
     pub command_input: String,
     pub current_file: String,
     pub dirty: bool, 
+
+    pub warning: bool,
 }
 
 impl Default for App {
@@ -44,9 +47,11 @@ impl Default for App {
             viewport_height: Cell::new(20),
             exit: false,
             mode: Mode::default(),
+            status_text: String::new(),
             command_input: String::new(),
             current_file: String::new(),
             dirty: false,
+            warning: false,
         }
     }
 }
@@ -75,8 +80,18 @@ impl App {
         Ok(())
     }
 
+    pub fn show_warning(&mut self, text: String) {
+        self.warning = true;
+        self.status_text = text;
+    }
+
+    pub fn reset_warning(&mut self) {
+        self.warning = false;
+        self.status_text = String::new();
+    }
+
     fn draw(
-        &self,
+        &mut self,
         frame: &mut Frame,
     ) {
         ui::draw(frame, self);
@@ -94,7 +109,9 @@ impl App {
                 (self.cursor.y - self.scroll_y) as u16,
             ));
         }
+            
     }
+    
 
     fn handle_events(
         &mut self
@@ -179,14 +196,15 @@ impl App {
                 match self.command_input.as_str() {
                     ":q" => {
                         if self.dirty {
-                            // TODO: IMPLEMENT WARNING
+                            self.show_warning("file is unsaved".to_string());
+                        } else {
+                            self.exit = true;
                         }
-                        self.exit = true;
                     }
                     ":w" => {
                         if !self.current_file.is_empty() {
                             if let Err(_) = self.document.save(&self.current_file) {
-                                // TODO: Show error to user
+                                self.show_warning("file does not exist".to_string());
                             } else {
                                 self.dirty = false;
                             }
@@ -194,14 +212,21 @@ impl App {
                             // TODO: Prompt for filename
                         }
                     }
-                    ":wq" => {
+                    ":wq" | ":x" => {
                         if !self.current_file.is_empty() {
-                            if let Ok(()) = self.document.save(&self.current_file) {
-                                self.exit = true;
+                            match self.document.save(&self.current_file) {
+                                Ok(()) => {
+                                    self.dirty = false;
+                                    self.exit = true;
+                                }
+                                Err(_) => {
+                                    self.show_warning("failed to save file".to_string());
+                                }
                             }
+                        } else {
+                            self.show_warning("no file specified".to_string());
                         }
                     }
-
                     _ => {}
                 }
 

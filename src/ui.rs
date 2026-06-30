@@ -16,7 +16,7 @@ use crate::app::App;
 
 pub fn draw(
     frame: &mut Frame,
-    app: &App,
+    app: &mut App,
 ) {
     frame.render_widget(
         app,
@@ -25,7 +25,7 @@ pub fn draw(
 }
 
 
-impl Widget for &App {
+impl Widget for &mut App {
 
     fn render(
         self,
@@ -57,13 +57,16 @@ impl Widget for &App {
 
 
         let status = match self.mode {
-            crate::mode::Mode::Insert => "INSERT",
-            crate::mode::Mode::Command =>
-                &self.command_input,
+            crate::mode::Mode::Insert if self.warning == true => format!("< INSERT > {}", self.status_text),
+            crate::mode::Mode::Insert => "< INSERT >".to_string(),
+            crate::mode::Mode::Command => self.command_input.clone(),
         };
 
 
         Paragraph::new(status)
             .render(chunks[1], buf);
+
+
+        self.reset_warning();
     }
 }
