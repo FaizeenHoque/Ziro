@@ -50,13 +50,13 @@ impl Default for App {
 }
 
 impl App {
-    pub fn new(file: Option<String>) -> Self {
+    pub fn new(file: Option<String>) -> io::Result<Self> {
         let mut app = Self::default();
         if let Some(filename) = file {
             app.current_file = filename.clone();
-            // TODO: Load
+            app.document = Document::from_file(&filename)?;
         }
-        app
+        Ok(app)
     }
 
     pub fn run(&mut self, terminal: &mut DefaultTerminal,) -> io::Result<()> {

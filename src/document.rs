@@ -1,3 +1,5 @@
+use std::io;
+
 #[derive(Debug)]
 pub struct Document {
     pub lines: Vec<String>,
@@ -12,6 +14,22 @@ impl Default for Document {
 }
 
 impl Document {
+    pub fn from_file(path: &str) -> io::Result<Self> {
+        let content = std::fs::read_to_string(path)?;
+        let lines = content
+            .lines()
+            .map(|s| s.to_string())
+            .collect::<Vec<String>>();
+
+        Ok(Self { 
+            lines: if lines.is_empty() {
+                vec![String::new()]
+            } else {
+                lines
+            },
+         })
+    }
+
     pub fn insert_char(&mut self, x: usize, y: usize, c: char,) {
         self.lines[y].insert(x, c);
     }

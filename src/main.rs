@@ -14,7 +14,6 @@ fn main() -> io::Result<()> {
     let filename = env::args().nth(1);
     
     ratatui::run(|terminal| {
-        let mut app = App::new(filename);
-        app.run(terminal)
+        App::new(filename)?.run(terminal)
     })
 }
