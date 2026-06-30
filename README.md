@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="static/ziro_banner.svg" alt="Ziro banner" />
+<img src="assets/ziro_banner.svg" alt="Ziro banner" />
 
 ![Status](https://img.shields.io/badge/status-building-blueviolet?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-white?style=flat-square)
