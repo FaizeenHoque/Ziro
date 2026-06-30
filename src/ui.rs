@@ -14,7 +14,6 @@ use ratatui::{
 
 use crate::app::App;
 
-
 pub fn draw(
     frame: &mut Frame,
     app: &App,
@@ -40,13 +39,18 @@ impl Widget for &App {
         ])
         .split(area);
 
+        let viewport_height = chunks[0].height as usize;
+        self.viewport_height.set(viewport_height);
 
-        let text: Vec<Line> =
-            self.document.lines
+        let text: Vec<Line> = self.document.lines
             .iter()
-            .map(|line| Line::from(line.as_str()))
+            .skip(self.scroll_y)
+            .take(viewport_height)
+            .enumerate()
+            .map(|(i, line)| {
+                Line::from(format!("{:4} {}", self.scroll_y + i + 1, line))
+            })
             .collect();
-
 
         Paragraph::new(text)
             .render(chunks[0], buf);

@@ -1,4 +1,5 @@
 use std::io;
+use std::cell::Cell;
 
 use crossterm::event::{
     self,
@@ -19,15 +20,31 @@ use crate::{
     ui,
 };
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct App {
     pub document: Document,
     pub cursor: Cursor,
 
+    pub scroll_y: usize,
+    pub viewport_height: Cell<usize>,
+
     exit: bool,
     pub mode: Mode,
-
     pub command_input: String,
+}
+
+impl Default for App {
+    fn default() -> Self {
+        Self {
+            document: Document::default(),
+            cursor: Cursor::default(),
+            scroll_y: 0,
+            viewport_height: Cell::new(20),
+            exit: false,
+            mode: Mode::default(),
+            command_input: String::new(),
+        }
+    }
 }
 
 impl App {
@@ -61,8 +78,8 @@ impl App {
             ));
         } else {
             frame.set_cursor_position((
-                self.cursor.x as u16,
-                self.cursor.y as u16,
+                (self.cursor.x + 5) as u16,
+                (self.cursor.y - self.scroll_y) as u16,
             ));
         }
     }
@@ -166,6 +183,18 @@ impl App {
                 self.command_input.clear();
             }
             _ => {}
+        }
+
+        self.update_scroll(self.viewport_height.get());
+    }
+
+    pub fn update_scroll(&mut self, viewport_height: usize) {
+        if self.cursor.y < self.scroll_y {
+            self.scroll_y = self.cursor.y;
+        }
+
+        if self.cursor.y >= self.scroll_y + viewport_height {
+            self.scroll_y = self.cursor.y - viewport_height + 1;
         }
     }
 }
