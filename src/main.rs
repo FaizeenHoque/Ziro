@@ -63,12 +63,20 @@ impl App {
     fn draw(&self, frame: &mut Frame) {
         frame.render_widget(self, frame.area());
 
-        frame.set_cursor_position((
+        let area = frame.area();
+
+        if self.mode == Mode::Command {
+            frame.set_cursor_position((
+                self.command_input.len() as u16 + 1,
+                area.height - 1,
+            ));
+        } else {
+            frame.set_cursor_position((
                 self.cursor.x as u16,
                 self.cursor.y as u16,
             ));
+        }
     }
-
     fn handle_events(&mut self) -> io::Result<()> {
         match event::read()? {
             Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
@@ -133,6 +141,8 @@ impl App {
             }
             KeyCode::Enter if self.mode == Mode::Command => {
                 if self.command_input == ":q" {
+                    self.exit();
+                } else if self.command_input == ":x" {
                     self.exit();
                 }
                 self.command_input.clear();
@@ -208,7 +218,7 @@ impl Widget for &App {
 
         let status = match self.mode {
             Mode::Insert => "INSERT",
-            Mode::Command => &format!("> {}", self.command_input),
+            Mode::Command => &format!("{}", self.command_input),
         };
 
         Paragraph::new(status)
