@@ -126,9 +126,9 @@ fn render_command_dialogue(frame: &mut Frame, app: &App) {
     frame.render_widget(Clear, area);
 
     let popup_area = Layout::vertical([
-        Constraint::Percentage(30),
-        Constraint::Percentage(15),
-        Constraint::Percentage(30),
+        Constraint::Fill(1),
+        Constraint::Length(3),
+        Constraint::Fill(1),
     ])
     .split(area)[1];
 
