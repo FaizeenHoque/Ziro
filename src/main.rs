@@ -1,8 +1,14 @@
 use std::io;
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
+
 use ratatui::{
-    DefaultTerminal, Frame, buffer::Buffer, layout::{Alignment, Constraint, Direction, Flex, HorizontalAlignment::Center, Layout, Rect}, style::Stylize, symbols::border, text::{Line, Text}, widgets::{Block, Paragraph, Widget},
+    DefaultTerminal, Frame,
+    buffer::Buffer,
+    layout::{Alignment, Constraint, Direction, Flex, Layout, Rect},
+    style::{Color, Stylize},
+    text::{Line, Text},
+    widgets::{Block, BorderType, Clear, Paragraph, Widget},
 };
 
 #[derive(Debug, Default, PartialEq)]
@@ -17,14 +23,16 @@ enum Mode {
 pub struct App {
     exit: bool,
     mode: Mode,
+    show_dialogue: bool,
 }
 
 impl App {
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
         while !self.exit {
             terminal.draw(|frame| {
-                return self.draw(frame);
+                self.draw(frame);
             })?;
+
             self.handle_events()?;
         }
 
@@ -33,6 +41,10 @@ impl App {
 
     fn draw(&self, frame: &mut Frame) {
         frame.render_widget(self, frame.area());
+
+        if self.show_dialogue {
+            render_command_dialogue(frame);
+        }
     }
 
     fn handle_events(&mut self) -> io::Result<()> {
@@ -47,8 +59,20 @@ impl App {
 
     fn handle_key_event(&mut self, key_event: KeyEvent) {
         match key_event.code {
-            KeyCode::Esc => self.mode = Mode::Command,
-            KeyCode::Char('q') if self.mode == Mode::Command => self.exit(),
+            KeyCode::Esc => {
+                if self.show_dialogue == false {
+                    self.show_dialogue = true;
+                    self.mode = Mode::Command;
+                } else {
+                    self.show_dialogue = false;
+                    self.mode = Mode::Normal;
+                }
+            }
+
+            KeyCode::Char('q') if self.mode == Mode::Command => {
+                self.exit();
+            }
+
             _ => {}
         }
     }
@@ -80,6 +104,39 @@ impl Widget for &App {
         .alignment(Alignment::Center)
         .render(area, buf);
     }
+}
+
+fn render_command_dialogue(frame: &mut Frame) {
+    let area = frame.area();
+
+    frame.render_widget(Clear, area);
+
+    let popup_area = Layout::vertical([
+        Constraint::Percentage(30),
+        Constraint::Percentage(15),
+        Constraint::Percentage(30),
+    ])
+    .split(area)[1];
+
+    let popup_area_horiz = Layout::horizontal([
+        Constraint::Percentage(30),
+        Constraint::Percentage(40),
+        Constraint::Percentage(30),
+    ])
+    .split(popup_area)[1];
+
+    // 4. Render the dialogue widget
+    let dialog_block = Block::bordered()
+        .title("Command")
+        .border_type(BorderType::Rounded)
+        .bg(Color::Black);
+
+    let paragraph = Paragraph::new("> ")
+        .block(dialog_block)
+        .alignment(Alignment::Left);
+
+    frame.render_widget(Clear, popup_area_horiz);
+    frame.render_widget(paragraph, popup_area_horiz);
 }
 
 fn main() -> io::Result<()> {
