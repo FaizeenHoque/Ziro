@@ -24,6 +24,7 @@ pub struct App {
     exit: bool,
     mode: Mode,
     show_dialogue: bool,
+    command_input: String
 }
 
 impl App {
@@ -43,7 +44,7 @@ impl App {
         frame.render_widget(self, frame.area());
 
         if self.show_dialogue {
-            render_command_dialogue(frame);
+            render_command_dialogue(frame, self);
         }
     }
 
@@ -69,8 +70,19 @@ impl App {
                 }
             }
 
-            KeyCode::Char('q') if self.mode == Mode::Command => {
-                self.exit();
+            KeyCode::Char(c) if self.mode == Mode::Command => {
+                self.command_input.push(c);
+            }
+
+            KeyCode::Backspace if self.mode == Mode::Command => {
+                self.command_input.pop();
+            }
+
+            KeyCode::Enter if self.mode == Mode::Command => {
+                if self.command_input == ":q" {
+                    self.exit();
+                }
+                self.command_input.clear();
             }
 
             _ => {}
@@ -106,7 +118,7 @@ impl Widget for &App {
     }
 }
 
-fn render_command_dialogue(frame: &mut Frame) {
+fn render_command_dialogue(frame: &mut Frame, app: &App) {
     let area = frame.area();
 
     frame.render_widget(Clear, area);
@@ -131,7 +143,7 @@ fn render_command_dialogue(frame: &mut Frame) {
         .border_type(BorderType::Rounded)
         .bg(Color::Black);
 
-    let paragraph = Paragraph::new("> ")
+    let paragraph = Paragraph::new(format!("> {}", app.command_input))
         .block(dialog_block)
         .alignment(Alignment::Left);
 
