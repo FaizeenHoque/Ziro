@@ -201,6 +201,9 @@ impl App {
                             self.exit = true;
                         }
                     }
+                    ":!q" => {
+                        self.exit = true;
+                    }
                     ":w" => {
                         if !self.current_file.is_empty() {
                             if let Err(_) = self.document.save(&self.current_file) {
