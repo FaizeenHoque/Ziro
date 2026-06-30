@@ -83,6 +83,8 @@ impl App {
                     self.exit();
                 }
                 self.command_input.clear();
+                self.show_dialogue = false;
+                self.mode = Mode::Normal;
             }
 
             _ => {}
