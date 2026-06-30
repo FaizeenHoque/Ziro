@@ -4,6 +4,7 @@ mod cursor;
 mod document;
 mod mode;
 mod ui;
+mod syntax;
 
 use std::io;
 use std::env;

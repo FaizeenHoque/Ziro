@@ -60,7 +60,7 @@ Ziro is in early development. Nothing is stable. Everything is being built.
 * [x] Terminal interface
 * [x] Editor UI
 * [X] File open/save
-* [ ] Syntax highlighting
+* [X] Syntax highlighting
 * [ ] LSP integration
 * [ ] Config system
 * [ ] Plugin system
