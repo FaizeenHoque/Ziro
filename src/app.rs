@@ -160,13 +160,13 @@ impl App {
             }
 
             // Document Movement Keybinds
-            KeyCode::Up if self.mode == Mode::Insert => {
+            KeyCode::Up if self.mode == Mode::Insert || self.mode == Mode::Normal => {
                 self.cursor.y = self.cursor.y.saturating_sub(1);
 
                 self.cursor.x = self.cursor.x
                     .min(self.document.lines[self.cursor.y].len());
             }
-            KeyCode::Down if self.mode == Mode::Insert => {
+            KeyCode::Down if self.mode == Mode::Insert || self.mode == Mode::Normal => {
                 if self.cursor.y + 1 < self.document.lines.len() {
                     self.cursor.y += 1;
 
@@ -174,10 +174,35 @@ impl App {
                         .min(self.document.lines[self.cursor.y].len());
                 }
             }
-            KeyCode::Left if self.mode == Mode::Insert => {
+            KeyCode::Left if self.mode == Mode::Insert || self.mode == Mode::Normal => {
                 self.cursor.x = self.cursor.x.saturating_sub(1);
             }
-            KeyCode::Right if self.mode == Mode::Insert => {
+            KeyCode::Right if self.mode == Mode::Insert || self.mode == Mode::Normal => {
+                let line_length = self.document.lines[self.cursor.y].len();
+
+                if self.cursor.x < line_length {
+                    self.cursor.x += 1;
+                }
+            }
+
+            KeyCode::Char('k') if self.mode == Mode::Normal => {
+                self.cursor.y = self.cursor.y.saturating_sub(1);
+
+                self.cursor.x = self.cursor.x
+                    .min(self.document.lines[self.cursor.y].len());
+            }
+            KeyCode::Char('j') if self.mode == Mode::Normal => {
+                if self.cursor.y + 1 < self.document.lines.len() {
+                    self.cursor.y += 1;
+
+                    self.cursor.x = self.cursor.x
+                        .min(self.document.lines[self.cursor.y].len());
+                }
+            }
+            KeyCode::Char('h') if self.mode == Mode::Normal => {
+                self.cursor.x = self.cursor.x.saturating_sub(1);
+            }
+            KeyCode::Char('l') if self.mode == Mode::Normal => {
                 let line_length = self.document.lines[self.cursor.y].len();
 
                 if self.cursor.x < line_length {
@@ -234,18 +259,29 @@ impl App {
                 }
 
                 self.command_input.clear();
-                self.mode = Mode::Insert;
+                self.mode = Mode::Normal;
             }
 
             // Mode Switching
             KeyCode::Esc => {
                 self.mode = match self.mode {
-                    Mode::Insert => Mode::Command,
-                    Mode::Command => Mode::Insert,
+                    Mode::Normal => Mode::Normal,
+                    Mode::Insert => Mode::Normal,
+                    Mode::Command => Mode::Normal,
                 };
 
                 self.command_input.clear();
             }
+            
+            KeyCode::Char('i') if self.mode == Mode::Normal => {
+                self.mode = Mode::Insert;
+            }
+
+            KeyCode::Char(':') if self.mode == Mode::Normal => {
+                self.mode = Mode::Command;
+                self.command_input = ":".to_string();
+            }
+
             _ => {}
         }
 

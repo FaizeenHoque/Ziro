@@ -95,6 +95,7 @@ impl Widget for &mut App {
         Paragraph::new(text).render(chunks[0], buf);
 
         let status = match self.mode {
+            crate::mode::Mode::Normal => "< NORMAL >".to_string(),
             crate::mode::Mode::Insert if self.warning => {
                 format!("< INSERT > {}", self.status_text)
             }
