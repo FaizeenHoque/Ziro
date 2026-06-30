@@ -6,7 +6,6 @@ BINARY="ziro"
 
 echo "Installing $BINARY..."
 
-# Get latest release tag from GitHub API
 LATEST=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" \
     | grep '"tag_name"' \
     | cut -d'"' -f4)
@@ -18,8 +17,16 @@ fi
 
 URL="https://github.com/$REPO/releases/download/$LATEST/$BINARY"
 
-curl -L "$URL" -o "/tmp/$BINARY"
+echo "Downloading $BINARY $LATEST..."
+echo "URL: $URL"  
+
+if ! curl -Lf "$URL" -o "/tmp/$BINARY"; then
+    echo "Error: Binary not found at $URL"
+    echo "Make sure you uploaded the binary with: gh release create"
+    exit 1
+fi
+
 chmod +x "/tmp/$BINARY"
 sudo mv "/tmp/$BINARY" "/usr/local/bin/$BINARY"
 
-echo "Installed $BINARY $LATEST to /usr/local/bin/$BINARY"
+echo "Installed $BINARY $LATEST"
