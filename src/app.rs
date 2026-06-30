@@ -31,6 +31,7 @@ pub struct App {
     exit: bool,
     pub mode: Mode,
     pub command_input: String,
+    pub current_file: String,
 }
 
 impl Default for App {
@@ -43,11 +44,20 @@ impl Default for App {
             exit: false,
             mode: Mode::default(),
             command_input: String::new(),
+            current_file: String::new(),
         }
     }
 }
 
 impl App {
+    pub fn new(file: Option<String>) -> Self {
+        let mut app = Self::default();
+        if let Some(filename) = file {
+            app.current_file = filename.clone();
+            // TODO: Load
+        }
+        app
+    }
 
     pub fn run(&mut self, terminal: &mut DefaultTerminal,) -> io::Result<()> {
 
