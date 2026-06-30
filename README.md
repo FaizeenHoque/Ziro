@@ -47,24 +47,7 @@ curl -sSL https://raw.githubusercontent.com/FaizeenHoque/ziro/main/install-rolli
 > [!WARNING]
 > Both scripts require `sudo` to move the binary to `/usr/local/bin`. Read the script before running if you're cautious about piping curl to bash.
 
----
-
-## usage
-
-```bash
-ziro              # open blank editor
-ziro file.txt     # open a file
-```
-
-| Keybind | Action |
-| ------- | ------ |
-| `Esc` | Toggle command mode |
-| `:w` | Save |
-| `:q` | Quit |
-| `:wq` / `:x` | Save and quit |
-
-> [!IMPORTANT]
-> Ziro will warn you if you try to quit with unsaved changes. Use `:wq` to save and exit in one step.
+→ **[Full usage guide and keybinds](https://github.com/FaizeenHoque/Ziro/wiki)**
 
 ---
 
