@@ -30,6 +30,12 @@ impl Document {
          })
     }
 
+    pub fn save(&self, path: &str) -> io::Result<()> {
+        let content = self.lines.join("\n");
+        std::fs::write(path, content)?;
+        Ok(())
+    }
+
     pub fn insert_char(&mut self, x: usize, y: usize, c: char,) {
         self.lines[y].insert(x, c);
     }

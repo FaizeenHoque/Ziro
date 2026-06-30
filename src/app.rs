@@ -32,6 +32,7 @@ pub struct App {
     pub mode: Mode,
     pub command_input: String,
     pub current_file: String,
+    pub dirty: bool, 
 }
 
 impl Default for App {
@@ -45,6 +46,7 @@ impl Default for App {
             mode: Mode::default(),
             command_input: String::new(),
             current_file: String::new(),
+            dirty: false,
         }
     }
 }
@@ -117,6 +119,7 @@ impl App {
                 );
 
                 self.cursor.x += 1;
+                self.dirty = true;
             }
             KeyCode::Enter if self.mode == Mode::Insert => {
                 self.document.split_line(
@@ -126,6 +129,7 @@ impl App {
 
                 self.cursor.y += 1;
                 self.cursor.x = 0;
+                self.dirty = true;
             }
             KeyCode::Backspace if self.mode == Mode::Insert => {
                 let (x, y) = self.document.backspace(
@@ -135,6 +139,7 @@ impl App {
 
                 self.cursor.x = x;
                 self.cursor.y = y;
+                self.dirty = true;
             }
 
             // Document Movement Keybinds
@@ -172,8 +177,29 @@ impl App {
             }
             KeyCode::Enter if self.mode == Mode::Command => {
                 match self.command_input.as_str() {
-                    ":q" | ":x" => {
+                    ":q" => {
+                        if self.dirty {
+                            // TODO: IMPLEMENT WARNING
+                        }
                         self.exit = true;
+                    }
+                    ":w" => {
+                        if !self.current_file.is_empty() {
+                            if let Err(_) = self.document.save(&self.current_file) {
+                                // TODO: Show error to user
+                            } else {
+                                self.dirty = false;
+                            }
+                        } else {
+                            // TODO: Prompt for filename
+                        }
+                    }
+                    ":wq" => {
+                        if !self.current_file.is_empty() {
+                            if let Ok(()) = self.document.save(&self.current_file) {
+                                self.exit = true;
+                            }
+                        }
                     }
 
                     _ => {}
