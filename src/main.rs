@@ -14,17 +14,37 @@ use ratatui::{
 #[derive(Debug, Default, PartialEq)]
 enum Mode {
     #[default]
-    Normal,
     Insert,
     Command,
 }
 
 #[derive(Debug, Default)]
 pub struct App {
+    document: Document,
+    cursor: Cursor,
     exit: bool,
     mode: Mode,
     show_dialogue: bool,
-    command_input: String
+    command_input: String,
+}
+
+#[derive(Debug)]
+struct Document {
+    lines: Vec<String>
+}
+
+impl Default for Document {
+    fn default() -> Self {
+        Self {
+            lines: vec![String::new()],
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct Cursor {
+    x: usize,
+    y: usize
 }
 
 impl App {
@@ -43,9 +63,10 @@ impl App {
     fn draw(&self, frame: &mut Frame) {
         frame.render_widget(self, frame.area());
 
-        if self.show_dialogue {
-            render_command_dialogue(frame, self);
-        }
+        frame.set_cursor_position((
+                self.cursor.x as u16,
+                self.cursor.y as u16,
+            ));
     }
 
     fn handle_events(&mut self) -> io::Result<()> {
@@ -60,34 +81,107 @@ impl App {
 
     fn handle_key_event(&mut self, key_event: KeyEvent) {
         match key_event.code {
-            KeyCode::Esc => {
-                if self.show_dialogue == false {
-                    self.show_dialogue = true;
-                    self.mode = Mode::Command;
-                } else {
-                    self.show_dialogue = false;
-                    self.mode = Mode::Normal;
+            // Document Typing
+            KeyCode::Char(c) if self.mode == Mode::Insert => {
+                self.insert_char(c);
+            }
+            KeyCode::Enter if self.mode == Mode::Insert => {
+                let new_line = self.document.lines[self.cursor.y]
+                    .split_off(self.cursor.x);
+
+                self.document.lines.insert(
+                    self.cursor.y + 1,
+                    new_line,
+                );
+
+                self.cursor.y += 1;
+                self.cursor.x = 0;
+            }
+            KeyCode::Backspace if self.mode == Mode::Insert => {
+                self.backspace();
+            }
+
+            // Document Movement Keybinds
+            KeyCode::Up if self.mode == Mode::Insert => {
+                self.cursor.y = self.cursor.y.saturating_sub(1);
+            }
+            KeyCode::Down if self.mode == Mode::Insert => {
+                if self.cursor.y + 1 < self.document.lines.len() {
+                    self.cursor.y += 1;
+
+                    self.cursor.x = self.cursor.x
+                        .min(self.document.lines[self.cursor.y].len());
+                }
+            }
+            KeyCode::Left if self.mode == Mode::Insert => {
+                self.cursor.x = self.cursor.x.saturating_sub(1);
+            }
+            KeyCode::Right if self.mode == Mode::Insert => {
+                let line_length = self.document.lines[self.cursor.y].len();
+
+                if self.cursor.x < line_length {
+                    self.cursor.x += 1;
                 }
             }
 
+            // Command Dialogue keybinds
             KeyCode::Char(c) if self.mode == Mode::Command => {
                 self.command_input.push(c);
             }
-
             KeyCode::Backspace if self.mode == Mode::Command => {
                 self.command_input.pop();
             }
-
             KeyCode::Enter if self.mode == Mode::Command => {
                 if self.command_input == ":q" {
                     self.exit();
                 }
                 self.command_input.clear();
                 self.show_dialogue = false;
-                self.mode = Mode::Normal;
+                self.mode = Mode::Insert;
             }
-
+            KeyCode::Esc => {
+                if self.show_dialogue == false {
+                    self.show_dialogue = true;
+                    self.mode = Mode::Command;
+                } else {
+                    self.command_input.clear();
+                    self.show_dialogue = false;
+                    self.mode = Mode::Insert;
+                }
+            }
+            
             _ => {}
+        }
+    }
+
+    fn insert_char(&mut self, c: char) {
+        if self.cursor.y >= self.document.lines.len() {
+            self.document.lines.push(String::new());
+        }
+
+        self.document.lines[self.cursor.y]
+            .insert(self.cursor.x, c);
+
+        self.cursor.x += 1;
+    }
+
+    fn backspace(&mut self) {
+        if self.cursor.x > 0 {
+            self.document.lines[self.cursor.y]
+                .remove(self.cursor.x - 1);
+
+            self.cursor.x -= 1;
+        } 
+        else if self.cursor.y > 0 {
+            let current_line = self.document.lines.remove(self.cursor.y);
+
+            self.cursor.y -= 1;
+
+            let previous_length = self.document.lines[self.cursor.y].len();
+
+            self.document.lines[self.cursor.y].push_str(&current_line);
+
+            self.cursor.x = previous_length;
         }
     }
 
@@ -98,59 +192,28 @@ impl App {
 
 impl Widget for &App {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let area = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Length(3)])
-            .flex(Flex::Center)
-            .split(area)[0];
+        let chunks = Layout::vertical([
+            Constraint::Min(1),
+            Constraint::Length(1),
+        ])
+        .split(area);
 
-        let area = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Length(40)])
-            .flex(Flex::Center)
-            .split(area)[0];
+        let text: Vec<Line> = self.document.lines
+            .iter()
+            .map(|line| Line::from(line.as_str()))
+            .collect();
 
-        Paragraph::new(Text::from(vec![
-            Line::from("Ziro Editor"),
-            Line::from("Your editor shouldn't slow you down."),
-            Line::from("Instruction Mode <ESC>  |  Exit <:q>"),
-        ]))
-        .alignment(Alignment::Center)
-        .render(area, buf);
+        Paragraph::new(text)
+            .render(chunks[0], buf);
+
+        let status = match self.mode {
+            Mode::Insert => "INSERT",
+            Mode::Command => &format!("> {}", self.command_input),
+        };
+
+        Paragraph::new(status)
+            .render(chunks[1], buf);
     }
-}
-
-fn render_command_dialogue(frame: &mut Frame, app: &App) {
-    let area = frame.area();
-
-    frame.render_widget(Clear, area);
-
-    let popup_area = Layout::vertical([
-        Constraint::Fill(1),
-        Constraint::Length(3),
-        Constraint::Fill(1),
-    ])
-    .split(area)[1];
-
-    let popup_area_horiz = Layout::horizontal([
-        Constraint::Percentage(30),
-        Constraint::Percentage(40),
-        Constraint::Percentage(30),
-    ])
-    .split(popup_area)[1];
-
-    // 4. Render the dialogue widget
-    let dialog_block = Block::bordered()
-        .title("Command")
-        .border_type(BorderType::Rounded)
-        .bg(Color::Black);
-
-    let paragraph = Paragraph::new(format!("> {}", app.command_input))
-        .block(dialog_block)
-        .alignment(Alignment::Left);
-
-    frame.render_widget(Clear, popup_area_horiz);
-    frame.render_widget(paragraph, popup_area_horiz);
 }
 
 fn main() -> io::Result<()> {
