@@ -1,10 +1,10 @@
 use ratatui::{
     Frame,
     buffer::Buffer,
-    layout::{Constraint, Layout},
+    layout::{Constraint, Layout, Rect},
     text::{Line, Span},
-    style::Style,
-    widgets::{Paragraph, Widget},
+    style::{Style, Color},
+    widgets::{Block, Borders, Clear, Paragraph, Widget},
 };
 
 use syntect::easy::HighlightLines;
@@ -18,7 +18,16 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     frame.render_widget(app, frame.area());
 }
 
-fn highlight_lines<'a>(
+fn centered_rect(width: u16, height: u16, area: Rect) -> Rect {
+    Rect {
+        x: area.width.saturating_sub(width) / 2,
+        y: area.height.saturating_sub(height) / 2,
+        width: width.min(area.width),
+        height: height.min(area.height),
+    }
+}
+
+fn highlight_lines(
     content: &str,
     file_path: &str,
     syntax_set: &SyntaxSet,
@@ -41,7 +50,7 @@ fn highlight_lines<'a>(
                 .into_iter()
                 .map(|(style, text)| {
                     Span::styled(
-                        text.to_string(), // FIX: owned string, no lifetime issue
+                        text.to_string(),
                         Style::new().fg(ratatui::style::Color::Rgb(
                             style.foreground.r,
                             style.foreground.g,
@@ -101,9 +110,35 @@ impl Widget for &mut App {
             }
             crate::mode::Mode::Insert => "< INSERT >".to_string(),
             crate::mode::Mode::Command => self.command_input.clone(),
+            crate::mode::Mode::FilenamePrompt if self.warning => {
+                format!("< NORMAL > {}", self.status_text)
+            }
+            crate::mode::Mode::FilenamePrompt => "< NORMAL >".to_string(),
         };
 
         Paragraph::new(status).render(chunks[1], buf);
+
+        // Filename popup
+        if self.mode == crate::mode::Mode::FilenamePrompt {
+            let popup_area = centered_rect(40, 5, area);
+
+            Clear.render(popup_area, buf);
+
+            Block::new()
+                .title(" Enter filename ")
+                .borders(Borders::ALL)
+                .render(popup_area, buf);
+
+            let inner = Rect {
+                x: popup_area.x + 1,
+                y: popup_area.y + 2,
+                width: popup_area.width - 2,
+                height: 1,
+            };
+
+            Paragraph::new(self.filename_input.as_str())
+                .render(inner, buf);
+        }
 
         self.reset_warning();
     }

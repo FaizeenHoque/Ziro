@@ -4,4 +4,5 @@ pub enum Mode {
     Normal,
     Insert,
     Command,
+    FilenamePrompt,
 }

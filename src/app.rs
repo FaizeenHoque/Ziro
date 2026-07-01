@@ -23,6 +23,7 @@ use crate::{
 #[derive(Debug)]
 pub struct App {
     pub document: Document,
+    pub filename_input: String,
     pub cursor: Cursor,
 
     pub scroll_y: usize,
@@ -34,6 +35,7 @@ pub struct App {
     pub command_input: String,
     pub current_file: String,
     pub dirty: bool, 
+    pending_quit_after_save: bool,
 
     pub warning: bool,
 }
@@ -42,6 +44,7 @@ impl Default for App {
     fn default() -> Self {
         Self {
             document: Document::default(),
+            filename_input: String::new(),
             cursor: Cursor::default(),
             scroll_y: 0,
             viewport_height: Cell::new(20),
@@ -51,6 +54,7 @@ impl Default for App {
             command_input: String::new(),
             current_file: String::new(),
             dirty: false,
+            pending_quit_after_save: false,
             warning: false,
         }
     }
@@ -90,26 +94,32 @@ impl App {
         self.status_text = String::new();
     }
 
-    fn draw(
-        &mut self,
-        frame: &mut Frame,
-    ) {
+    fn draw(&mut self, frame: &mut Frame) {
         ui::draw(frame, self);
-
         let area = frame.area();
 
-        if self.mode == Mode::Command {
-            frame.set_cursor_position((
-                self.command_input.len() as u16,
-                area.height - 1,
-            ));
-        } else {
-            frame.set_cursor_position((
-                (self.cursor.x + 5) as u16,
-                (self.cursor.y - self.scroll_y) as u16,
-            ));
+        match self.mode {
+            Mode::Command => {
+                frame.set_cursor_position((
+                    self.command_input.len() as u16,
+                    area.height - 1,
+                ));
+            }
+            Mode::FilenamePrompt => {
+                let popup_x = area.width.saturating_sub(40) / 2;
+                let popup_y = area.height.saturating_sub(5) / 2;
+                frame.set_cursor_position((
+                    popup_x + 1 + self.filename_input.len() as u16,
+                    popup_y + 2,
+                ));
+            }
+            _ => {
+                frame.set_cursor_position((
+                    (self.cursor.x + 5) as u16,
+                    (self.cursor.y - self.scroll_y) as u16,
+                ));
+            }
         }
-            
     }
     
 
@@ -226,10 +236,12 @@ impl App {
                             self.exit = true;
                         }
                     }
-                    ":!q" => {
+                    ":!q" | ":q!" => {
                         self.exit = true;
                     }
                     ":w" => {
+                        self.pending_quit_after_save = false;
+
                         if !self.current_file.is_empty() {
                             if let Err(_) = self.document.save(&self.current_file) {
                                 self.show_warning("file does not exist".to_string());
@@ -237,10 +249,13 @@ impl App {
                                 self.dirty = false;
                             }
                         } else {
-                            // TODO: Prompt for filename
+                            self.mode = Mode::FilenamePrompt;
+                            self.filename_input.clear();
                         }
                     }
                     ":wq" | ":x" => {
+                        self.pending_quit_after_save = false;
+
                         if !self.current_file.is_empty() {
                             match self.document.save(&self.current_file) {
                                 Ok(()) => {
@@ -252,25 +267,37 @@ impl App {
                                 }
                             }
                         } else {
-                            self.show_warning("no file specified".to_string());
+                            self.pending_quit_after_save = true;
+                            self.mode = Mode::FilenamePrompt;
+                            self.filename_input.clear();
                         }
                     }
                     _ => {}
                 }
 
                 self.command_input.clear();
-                self.mode = Mode::Normal;
+                if self.mode == Mode::Command {
+                    self.mode = Mode::Normal;
+                }
             }
 
             // Mode Switching
             KeyCode::Esc => {
-                self.mode = match self.mode {
-                    Mode::Normal => Mode::Normal,
-                    Mode::Insert => Mode::Normal,
-                    Mode::Command => Mode::Normal,
-                };
+                if self.mode == Mode::FilenamePrompt {
+                    self.filename_input.clear();
+                    self.pending_quit_after_save = false;
+                    self.mode = Mode::Normal;
+                    self.show_warning("canceled file write".to_string());
+                } else {
+                    self.mode = match self.mode {
+                        Mode::Normal => Mode::Normal,
+                        Mode::Insert => Mode::Normal,
+                        Mode::Command => Mode::Normal,
+                        Mode::FilenamePrompt => Mode::FilenamePrompt,
+                    };
 
-                self.command_input.clear();
+                    self.command_input.clear();   
+                }
             }
             
             KeyCode::Char('i') if self.mode == Mode::Normal => {
@@ -282,6 +309,32 @@ impl App {
                 self.command_input = ":".to_string();
             }
 
+
+
+            KeyCode::Char(c) if self.mode == Mode::FilenamePrompt => {
+                self.filename_input.push(c);
+            }
+            KeyCode::Backspace if self.mode == Mode::FilenamePrompt => {
+                self.filename_input.pop();
+            }
+            KeyCode::Enter if self.mode == Mode::FilenamePrompt => {
+                if !self.filename_input.is_empty() {
+                    self.current_file = self.filename_input.clone();
+                    match self.document.save(&self.current_file) {
+                        Ok(()) => {
+                            self.dirty = false;
+
+                            if self.pending_quit_after_save {
+                                self.exit = true;
+                            }
+                        }
+                        Err(_) => { self.show_warning("failed to save".to_string()); }
+                    }
+                }
+                self.filename_input.clear();
+                self.pending_quit_after_save = false;
+                self.mode = Mode::Normal;
+            }
             _ => {}
         }
 
