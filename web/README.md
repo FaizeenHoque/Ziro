@@ -15,7 +15,7 @@ To recreate this project with the same configuration:
 
 ```sh
 # recreate this project
-npx sv@0.16.1 create --template minimal --types ts --add prettier tailwindcss="plugins:typography,forms" --install npm .
+npx sv@0.16.1 create --template minimal --types ts --add tailwindcss="plugins:typography,forms" prettier --install npm .
 ```
 
 ## Developing
