@@ -1,3 +1,47 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100..900;1,100..900&display=swap');
+
 @import 'tailwindcss';
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
+
+@theme {
+  --color-foreground: #121212;
+  --color-background: #F9FAFB;
+
+  --font-brand: "Roboto", sans-serif;
+}
+
+body {
+    background: var(--color-background);
+    color: var(--color-foreground);
+}
+
+* {
+	scrollbar-width: thin;
+	scrollbar-color: #14140F #F5F4EE;
+}
+ 
+/* WebKit / Chromium (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+	width: 10px;
+	height: 10px;
+}
+ 
+::-webkit-scrollbar-track {
+	background: #F5F4EE;
+}
+ 
+::-webkit-scrollbar-thumb {
+	background-color: #14140F;
+	border-radius: 999px;
+	border: 2px solid #F5F4EE;
+}
+ 
+::-webkit-scrollbar-thumb:hover {
+	background-color: #1F7A4C;
+}
+ 
+::-webkit-scrollbar-corner {
+	background: #F5F4EE;
+}
+ 
