@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { base } from '$app/paths';
 	import ziroMark from '$lib/assets/ziro_mark.svg';
 
 	let scrolled = $state(false);
@@ -14,11 +15,11 @@
 	});
 
 	const links = [
-		{ href: '/#why', label: 'Why' },
-		{ href: '/#goals', label: 'Goals' },
-		{ href: '/#stack', label: 'Stack' },
-		{ href: '/#install', label: 'Install' },
-		{ href: '/docs', label: 'Docs' }
+		{ href: `${base}/#why`, label: 'Why' },
+		{ href: `${base}/#goals`, label: 'Goals' },
+		{ href: `${base}/#stack`, label: 'Stack' },
+		{ href: `${base}/#install`, label: 'Install' },
+		{ href: `${base}/docs`, label: 'Docs' }
 	];
 </script>
 
@@ -29,7 +30,7 @@
 	class:bg-[#FCFCFA]={scrolled}
 >
 	<nav class="mx-auto max-w-5xl flex items-center justify-between px-6 h-16">
-		<a href="/" class="flex items-center gap-2.5 shrink-0">
+		<a href={`${base}/`} class="flex items-center gap-2.5 shrink-0">
 			<img src={ziroMark} alt="Ziro" class="h-30 w-30 rounded-[6px]" />
 			<!-- <span class="font-mono text-[15px] tracking-tight text-[#14140F]">ziro</span> -->
 		</a>
