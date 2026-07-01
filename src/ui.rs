@@ -67,11 +67,39 @@ fn highlight_lines(
 
 impl Widget for &mut App {
     fn render(self, area: ratatui::layout::Rect, buf: &mut Buffer) {
+        // let chunks = Layout::vertical([
+        //     Constraint::Min(1),
+        //     Constraint::Length(1),
+        // ])
+        // .split(area);
+
+        // let text: Vec<Line> = highlighted
+        //     .into_iter()
+        //     .skip(self.scroll_y)
+        //     .take(viewport_height)
+        //     .enumerate()
+        //     .map(|(i, line)| {
+        //         let mut spans = vec![
+        //             Span::raw(format!("{:4} ", self.scroll_y + i + 1)),
+        //         ];
+        //         spans.extend(line.spans);
+        //         Line::from(spans)
+        //     })
+        //     .collect();
+
+        // Paragraph::new(text).render(chunks[0], buf);
+
+        // Text editor area
         let chunks = Layout::vertical([
             Constraint::Min(1),
             Constraint::Length(1),
-        ])
-        .split(area);
+        ]).split(area);
+
+        let horizontal = Layout::horizontal([
+            Constraint::Length(self.number_col_width),
+            Constraint::Min(1),
+        ]).split(chunks[0]);
+
 
         let viewport_height = chunks[0].height as usize;
         self.viewport_height.set(viewport_height);
@@ -86,24 +114,38 @@ impl Widget for &mut App {
             &syntax_set,
             &theme_set,
         );
-
-        let text: Vec<Line> = highlighted
-            .into_iter()
+        
+        let numbers: Vec<Line> = highlighted
+            .iter()
             .skip(self.scroll_y)
             .take(viewport_height)
             .enumerate()
-            .map(|(i, line)| {
-                let mut spans = vec![
-                    Span::raw(format!("{:4} ", self.scroll_y + i + 1)),
-                ];
-                spans.extend(line.spans);
-                Line::from(spans)
+            .map(|(i, _line)| {
+                Line::from(vec![
+                    Span::styled(
+                        format!("{:>4} ", self.scroll_y + i + 1),
+                        Style::new().fg(Color::DarkGray),
+                    ),
+                ])
             })
             .collect();
 
-        Paragraph::new(text).render(chunks[0], buf);
+        let content_lines: Vec<Line> = highlighted
+            .into_iter()
+            .skip(self.scroll_y)
+            .take(viewport_height)
+            .map(|line| Line::from(line.spans))
+            .collect();
+
+        Paragraph::new(numbers).render(horizontal[0], buf);
+        Paragraph::new(content_lines).render(horizontal[1], buf);
+            
+        // Status bar
 
         let status = match self.mode {
+            crate::mode::Mode::Normal if self.warning => {
+                format!("< NORMAL > {}", self.status_text)
+            }
             crate::mode::Mode::Normal => "< NORMAL >".to_string(),
             crate::mode::Mode::Insert if self.warning => {
                 format!("< INSERT > {}", self.status_text)
@@ -140,6 +182,6 @@ impl Widget for &mut App {
                 .render(inner, buf);
         }
 
-        self.reset_warning();
+        // self.reset_warning();
     }
 }

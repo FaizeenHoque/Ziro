@@ -28,6 +28,7 @@ pub struct App {
 
     pub scroll_y: usize,
     pub viewport_height: Cell<usize>,
+    pub number_col_width: u16,
 
     exit: bool,
     pub mode: Mode,
@@ -56,6 +57,7 @@ impl Default for App {
             dirty: false,
             pending_quit_after_save: false,
             warning: false,
+            number_col_width: 6,
         }
     }
 }
@@ -115,7 +117,7 @@ impl App {
             }
             _ => {
                 frame.set_cursor_position((
-                    (self.cursor.x + 5) as u16,
+                    self.cursor.x as u16 + self.number_col_width,
                     (self.cursor.y - self.scroll_y) as u16,
                 ));
             }
@@ -135,6 +137,10 @@ impl App {
     }
 
     fn handle_key(&mut self, key: crossterm::event::KeyEvent,) {
+        if self.warning {
+            self.reset_warning();
+        }
+
         match key.code {
 
             // Document Typing
