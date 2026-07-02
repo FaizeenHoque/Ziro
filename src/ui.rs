@@ -22,6 +22,40 @@ fn centered_rect(width: u16, height: u16, area: Rect) -> Rect {
     }
 }
 
+fn render_explorer (app: &App, area: Rect, buf: &mut Buffer) {
+    Block::new()
+        .style(Style::new().bg(Color::Rgb(37, 37, 38)))
+        .render(area, buf);
+    
+    let inner = Rect {
+        x: area.x + 1,
+        y: area.y,
+        width: area.width.saturating_sub(1),
+        height: area.height,
+    };
+
+    let lines: Vec<Line> = app.explorer_entries.iter().enumerate().map(|(i, entry)| {
+        let selected = i == app.explorer_selected;
+        let style = if selected {
+            Style::new().bg(Color::Rgb(60, 60, 60)).fg(Color::White)
+        } else if entry.is_dir {
+            Style::new().fg(Color::LightBlue)
+        } else {
+            Style::new().fg(Color::Gray)
+        };
+
+        let label = if entry.is_dir {
+            format!("{}/", entry.name)
+        } else {
+            entry.name.clone()
+        };
+
+        Line::from(Span::styled(label, style))
+    }).collect();
+
+    Paragraph::new(lines).render(inner, buf);
+}
+
 impl Widget for &mut App {
     fn render(self, area: ratatui::layout::Rect, buf: &mut Buffer) {
 
@@ -39,11 +73,9 @@ impl Widget for &mut App {
                 Constraint::Length(crate::app::EXPLORER_WIDTH),
                 Constraint::Min(1),
             ]).split(chunks[1]);
-
-            Block::new()
-                .style(Style::new().bg(Color::Rgb(37, 37, 38)))
-                .render(split[0], buf);
-
+            
+            render_explorer(self, split[0], buf);
+            
             split[1]
         } else {
             chunks[1]

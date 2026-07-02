@@ -1,4 +1,5 @@
-use std::io;
+use std::fs::File;
+use std::{io, path::PathBuf};
 use std::cell::Cell;
 use std::time::Duration;
 
@@ -41,9 +42,20 @@ pub struct App {
     pub status: bool,
     pub filename_prompt: bool,
     pub show_explorer: bool,
+
+    pub explorer_entries: Vec<FileEntry>,
+    pub explorer_selected: usize,
+    pub explorer_cwd: PathBuf,
     
     pub pending_quit_after_save: bool,
     pub exit: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct FileEntry {
+    pub name: String,
+    pub path: PathBuf,
+    pub is_dir: bool
 }
 
 #[derive(Debug, Clone)]
@@ -92,6 +104,10 @@ impl Default for App {
             filename_prompt: false,
             show_explorer: false,
             
+            explorer_entries: Vec::new(),
+            explorer_selected: 0,
+            explorer_cwd: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+
             pending_quit_after_save: false,
             status: false,
             exit: false,
@@ -99,9 +115,39 @@ impl Default for App {
     }
 }
 
-pub const EXPLORER_WIDTH: u16 = 28;
+pub const EXPLORER_WIDTH: u16 = 40;
 
 impl App {
+    pub fn refresh_explorer(&mut self) {
+        let mut entries: Vec<FileEntry> = match std::fs::read_dir(&self.explorer_cwd) {
+            Ok(read) => read
+                .filter_map(|e| e.ok())
+                .map(|e| {
+                    let path = e.path();
+                    let name = e.file_name().to_string_lossy().to_string();
+                    let is_dir = path.is_dir();
+                    FileEntry { name, path, is_dir }
+                })
+                .collect(),
+
+            Err(_) => {
+                self.show_status("failed to read directory".to_string());
+                Vec::new()
+            }
+        };
+
+        entries.sort_by(|a, b| {
+            match (a.is_dir, b.is_dir) {
+                (true, false) => std::cmp::Ordering::Less,
+                (false, true) => std::cmp::Ordering::Greater,
+                _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()), 
+            }
+        });
+
+        self.explorer_entries = entries;
+        self.explorer_selected = 0;
+    }
+
     pub fn new(file: Option<String>) -> io::Result<Self> {
         let mut app = Self::default();
         if let Some(filename) = file {
@@ -385,6 +431,7 @@ impl App {
     pub fn toggle_explorer(&mut self) {
         if self.show_explorer == false {
             self.show_explorer = true;
+            self.refresh_explorer();
             self.show_status("Opened Explorer".to_string());
         } else {
             self.show_explorer = false;
