@@ -1,10 +1,1 @@
-<svg width="1400" height="400" viewBox="0 0 1400 400" xmlns="http://www.w3.org/2000/svg">
-  <g transform="translate(20,20) scale(0.5294)">
-    <rect x="60" y="60" width="560" height="560" rx="120" fill="#111111" stroke="#222222" stroke-width="1.5"/>
-    <polygon points="140,210 540,210 540,278 304,278 540,402 540,470 140,470 140,402 376,402 140,278" fill="#ffffff"/>
-    <polygon points="140,210 540,210 540,278 304,278 140,278" fill="#cccccc"/>
-    <polygon points="376,402 540,402 540,470 140,470 140,402" fill="#cccccc"/>
-    <polygon points="304,278 540,278 376,402 140,402" fill="#eeeeee"/>
-  </g>
-  <text x="420" y="290" font-family="Arial, Helvetica, sans-serif" font-weight="800" font-size="260" fill="#1a1a1a" letter-spacing="-4">Ziro</text>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="400" viewBox="0 0 1400 400"><g transform="translate(20,20) scale(0.5294)"><rect width="560" height="560" x="60" y="60" fill="#111" stroke="#222" stroke-width="1.5" rx="120"/><polygon fill="#fff" points="140 210 540 210 540 278 304 278 540 402 540 470 140 470 140 402 376 402 140 278"/><polygon fill="#ccc" points="140 210 540 210 540 278 304 278 140 278"/><polygon fill="#ccc" points="376 402 540 402 540 470 140 470 140 402"/><polygon fill="#eee" points="304 278 540 278 376 402 140 402"/></g><text x="420" y="290" fill="#1a1a1a" font-family="Arial, Helvetica, sans-serif" font-size="260" font-weight="800" letter-spacing="-4">Ziro</text></svg>
