@@ -46,12 +46,14 @@ fn render_explorer (app: &App, area: Rect, buf: &mut Buffer) {
             Style::new().fg(Color::Gray)
         };
 
-        let label = if entry.is_dir {
-            format!("{}/", entry.name)
+        let indent = "  ".repeat(entry.depth);
+        let marker = if entry.is_dir {
+            if entry.expanded { "v " } else { "> " }
         } else {
-            entry.name.clone()
+            " "
         };
 
+        let label = format!("{indent}{marker}{}", entry.name);
         Line::from(Span::styled(label, style))
     }).collect();
     Paragraph::new(lines).render(inner, buf);

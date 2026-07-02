@@ -54,7 +54,9 @@ pub struct App {
 pub struct FileEntry {
     pub name: String,
     pub path: PathBuf,
-    pub is_dir: bool
+    pub is_dir: bool,
+    pub depth: usize,
+    pub expanded: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -118,35 +120,32 @@ impl Default for App {
 pub const EXPLORER_WIDTH: u16 = 40;
 
 impl App {
-    pub fn refresh_explorer(&mut self) {
-        let mut entries: Vec<FileEntry> = match std::fs::read_dir(&self.explorer_cwd) {
+    pub fn read_dir_sorted(path: &PathBuf, depth: usize) -> Vec<FileEntry> {
+        let mut entries: Vec<FileEntry> = match std::fs::read_dir(path) {
             Ok(read) => read
                 .filter_map(|e| e.ok())
                 .map(|e| {
                     let path = e.path();
                     let name = e.file_name().to_string_lossy().to_string();
                     let is_dir = path.is_dir();
-                    FileEntry { name, path, is_dir }
-                })
-                .collect(),
-
-            Err(_) => {
-                self.show_status("failed to read directory".to_string());
-                Vec::new()
-            }
+                    FileEntry { name, path, is_dir, depth, expanded: false}
+                }).collect(),
+            Err(_) => Vec::new(),
         };
-
-        entries.sort_by(|a, b| {
-            match (a.is_dir, b.is_dir) {
-                (true, false) => std::cmp::Ordering::Less,
-                (false, true) => std::cmp::Ordering::Greater,
-                _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()), 
-            }
+        entries.sort_by(|a, b| match (a.is_dir, b.is_dir) {
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            _=>a.name.to_lowercase().cmp(&b.name.to_lowercase()),        
         });
 
-        self.explorer_entries = entries;
+        entries
+    }
+
+    pub fn refresh_explorer(&mut self) {
+        self.explorer_entries = Self::read_dir_sorted(&self.explorer_cwd, 0);
         self.explorer_selected = 0;
     }
+    
 
     pub fn new(file: Option<String>) -> io::Result<Self> {
         let mut app = Self::default();
@@ -382,50 +381,104 @@ impl App {
     }
 
     fn handle_mouse(&mut self, mouse: MouseEvent) {
-        if !self.show_explorer {
-            return;
-        }
+        match mouse.kind {
+            MouseEventKind::Down(MouseButton::Left) => {
+                 if !self.show_explorer {
+                    return;
+                }
 
-        if let MouseEventKind::Down(MouseButton::Left) = mouse.kind {
-            let area = self.explorer_area.get();
+                let area = self.explorer_area.get();
 
-            let inside = mouse.column >= area.x
-                && mouse.column < area.x + area.width
-                && mouse.row >= area.y
-                && mouse.row < area.y + area.height;
+                let inside = mouse.column >= area.x
+                    && mouse.column < area.x + area.width
+                    && mouse.row >= area.y
+                    && mouse.row < area.y + area.height;
+                
+                if !inside {
+                    return;
+                }
+
+                let clicked_row = (mouse.row - area.y) as usize;
+
+                if clicked_row < self.explorer_entries.len() {
+                    self.explorer_selected = clicked_row;
+                    self.open_selected_entry();
+                }
             
-            if !inside {
-                return;
             }
 
-            let clicked_row = (mouse.row - area.y) as usize;
+            MouseEventKind::ScrollUp => {
+                self.cursor.y = self.cursor.y.saturating_sub(3);
+                self.update_scroll(self.viewport_height.get());
+            }
 
-            if clicked_row < self.explorer_entries.len() {
-                self.explorer_selected = clicked_row;
-                self.open_selected_entry();
+
+            MouseEventKind::ScrollDown => {
+                let max_y = self.document.lines.len().saturating_sub(1);
+                self.cursor.y = (self.cursor.y + 3).min(max_y);
+                self.update_scroll(self.viewport_height.get());
+            }
+            _=>{}
+        }
+            
+    }
+
+    fn open_selected_entry(&mut self) {
+        let entry = match self
+            .explorer_entries
+            .get(self.explorer_selected)
+            .cloned()
+        {
+            Some(e) => e,
+            None => return,
+        };
+
+        if entry.is_dir {
+            if entry.expanded {
+                self.collapse_entry(self.explorer_selected);
+            } else {
+                self.expand_entry(self.explorer_selected);
+            } 
+        } else {
+            match Document::from_file(entry.path.to_str().unwrap_or_default()) {
+                Ok(doc) => {
+                    self.document = doc;
+                    self.current_file = entry.path.to_string_lossy().to_string();
+                    self.last_saved = self.document.lines.clone();
+                    self.cursor.x = 0;
+                    self.cursor.y = 0;
+                    self.scroll_y = 0;
+                }
+                Err(_) => self.show_status("failed to open file".to_string()),
             }
         }
     }
 
-    fn open_selected_entry(&mut self) {
-        if let Some(entry) = self.explorer_entries.get(self.explorer_selected).clone() {
-            if entry.is_dir {
-                self.explorer_cwd = entry.path.clone();
-                self.refresh_explorer();
-            } else {
-                match Document::from_file(entry.path.to_str().unwrap_or_default()) {
-                    Ok(doc) => {
-                        self.document = doc;
-                        self.current_file = entry.path.to_string_lossy().to_string();
-                        self.last_saved = self.document.lines.clone();
-                        self.cursor.x = 0;
-                        self.cursor.y = 0;
-                        self.scroll_y = 0;
-                    }
-                    Err(_) => self.show_status("failed to open file".to_string()),
-                }
-            }
-        }
+    fn expand_entry(&mut self, index: usize) {
+        let (path, depth) = {
+            let entry = &self.explorer_entries[index];
+            (entry.path.clone(), entry.depth)
+        };
+
+        let children = Self::read_dir_sorted(&path, depth+1);
+
+        self.explorer_entries[index].expanded = true;
+        self.explorer_entries.splice(index+1..index+1, children);
+    }
+
+    fn collapse_entry(&mut self, index: usize) {
+        let depth = self.explorer_entries[index].depth;
+
+        let end = self.explorer_entries[index + 1..]
+            .iter()
+            .position(|e| e.depth <= depth)
+            .map(|offset| index + 1 + offset)
+            .unwrap_or(self.explorer_entries.len());
+
+        self.explorer_entries.drain(index + 1..end);
+        self.explorer_entries[index].expanded = false;
+
+        self.explorer_selected = self.explorer_selected.min(self.explorer_entries.len().saturating_sub(1));
     }
 
     pub fn update_scroll(&mut self, viewport_height: usize) {
