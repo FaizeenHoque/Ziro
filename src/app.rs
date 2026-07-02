@@ -22,28 +22,28 @@ use crate::{
 #[derive(Debug)]
 pub struct App {
     pub document: Document,
-    pub filename_input: String,
     pub cursor: Cursor,
-
+    pub highlighter: Highlighter,
+    
     pub undo_stack: Vec<UndoState>,
     pub redo_stack: Vec<UndoState>,
     pub last_action: ActionKind,
-
+    pub last_saved: Vec<String>,
+    
     pub scroll_y: usize,
     pub viewport_height: Cell<usize>,
     pub number_col_width: u16,
-
-    pub highlighter: Highlighter,
-
-    pub status_text: String,
-    pub current_file: String,
-    pub last_saved: Vec<String>,
     
-    pub filename_prompt: bool,
-
-    pending_quit_after_save: bool,
-    exit: bool,
+    pub current_file: String,
+    pub filename_input: String,
+    
+    pub status_text: String,
     pub status: bool,
+    pub filename_prompt: bool,
+    pub show_explorer: bool,
+    
+    pub pending_quit_after_save: bool,
+    pub exit: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -76,27 +76,30 @@ impl Default for App {
             current_file: String::new(),
             highlighter: Highlighter::new(),
             cursor: Cursor::default(),
-
+            
             viewport_height: Cell::new(20),
             number_col_width: 7,
             scroll_y: 0,
-
+            
             filename_input: String::new(),
             status_text: String::new(),
-
+            
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
             last_action: ActionKind::None,
             last_saved,
             
             filename_prompt: false,
-
+            show_explorer: false,
+            
             pending_quit_after_save: false,
             status: false,
             exit: false,
         }
     }
 }
+
+pub const EXPLORER_WIDTH: u16 = 28;
 
 impl App {
     pub fn new(file: Option<String>) -> io::Result<Self> {
@@ -108,27 +111,29 @@ impl App {
         }
         Ok(app)
     }
-
+    
     pub fn run(&mut self, terminal: &mut DefaultTerminal,) -> io::Result<()> {
-
+        
         while !self.exit {
-
+            
             terminal.draw(|frame| {
                 self.draw(frame);
             })?;
-
+            
             self.handle_events()?;
         }
-
+        
         Ok(())
     }
 
+    pub fn editor_x_offset(&self) -> u16 {
+        if self.show_explorer { EXPLORER_WIDTH } else { 0 }
+    }
+    
     fn draw(&mut self, frame: &mut Frame) {
         ui::draw(frame, self);
         let area = frame.area();
-
         
-
         if self.filename_prompt == true  {
             let popup_x = area.width.saturating_sub(40) / 2;
             let popup_y = area.height.saturating_sub(5) / 2;
@@ -137,7 +142,7 @@ impl App {
                 popup_y + 2,
             ));
         } else {
-            let x = self.number_col_width + self.cursor.x as u16;
+            let x = self.editor_x_offset() + self.number_col_width + self.cursor.x as u16;
             let y = 1 + (self.cursor.y - self.scroll_y) as u16;
 
             frame.set_cursor_position((
@@ -146,8 +151,7 @@ impl App {
             ));
         }
     }
-
-
+    
     fn handle_events(
         &mut self
     ) -> io::Result<()> {
@@ -156,7 +160,7 @@ impl App {
                 self.handle_key(key);
             }
         }
-
+        
         while event::poll(Duration::from_millis(0))? {
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
@@ -164,10 +168,10 @@ impl App {
                 }
             }
         }
-
+        
         Ok(())
     }
-
+    
     pub fn is_dirty(&self) -> bool {
         self.document.lines != self.last_saved
     }
@@ -183,6 +187,11 @@ impl App {
                 self.pending_quit_after_save = false;
                 self.filename_prompt = false;
                 self.show_status("canceled file write".to_string());
+            }
+
+            KeyCode::Char('e') if 
+                    key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                self.toggle_explorer();
             }
 
             KeyCode::Char('w') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL)
@@ -370,6 +379,16 @@ impl App {
                 self.last_action = ActionKind::None;
             }
             None => self.show_status("nothing to redo".to_string()),
+        }
+    }
+
+    pub fn toggle_explorer(&mut self) {
+        if self.show_explorer == false {
+            self.show_explorer = true;
+            self.show_status("Opened Explorer".to_string());
+        } else {
+            self.show_explorer = false;
+            self.show_status("Closed Explorer".to_string());
         }
     }
 

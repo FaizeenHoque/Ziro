@@ -27,24 +27,37 @@ impl Widget for &mut App {
 
         let bar_style = Style::default().bg(Color::Rgb(20, 20, 20)).fg(Color::White);
 
-        // Text editor area
+        // Top bar / editor / status bar split
         let chunks = Layout::vertical([
             Constraint::Length(1),
             Constraint::Min(1),
             Constraint::Length(1),
         ]).split(area);
 
+        let editor_area = if self.show_explorer {
+            let split = Layout::horizontal([
+                Constraint::Length(crate::app::EXPLORER_WIDTH),
+                Constraint::Min(1),
+            ]).split(chunks[1]);
+
+            Block::new()
+                .style(Style::new().bg(Color::Rgb(37, 37, 38)))
+                .render(split[0], buf);
+
+            split[1]
+        } else {
+            chunks[1]
+        };
+
         let horizontal = Layout::horizontal([
             Constraint::Length(self.number_col_width),
             Constraint::Min(1),
-        ]).split(chunks[1]);
+        ]).split(editor_area);
 
-
-        let viewport_height = chunks[1].height as usize;
+        let viewport_height = editor_area.height as usize;
         self.viewport_height.set(viewport_height);
 
         let content = self.document.lines.join("\n");
-
         let highlighted = self.highlighter.highlight_lines(&content, &self.current_file);
 
         let numbers: Vec<Line> = highlighted
@@ -60,7 +73,7 @@ impl Widget for &mut App {
                     ),
                 ])
             })
-            .collect();   
+            .collect();
 
         let content_lines: Vec<Line> = highlighted
             .into_iter()
@@ -86,8 +99,8 @@ impl Widget for &mut App {
             .render(chunks[2], buf);
         Paragraph::new(status).render(chunks[2], buf);
 
-        // Filename popup
-        if self.filename_prompt == true {
+        // Filename popup 
+        if self.filename_prompt {
             let popup_area = centered_rect(40, 5, area);
 
             Clear.render(popup_area, buf);
