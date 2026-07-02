@@ -198,13 +198,15 @@ impl App {
                 }
             }
 
-            KeyCode::Char('u') if self.mode == Mode::Normal
+            KeyCode::Char('z') if self.mode == Mode::Normal
+                && key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL)
+                && key.modifiers.contains(crossterm::event::KeyModifiers::SHIFT) => {
+                self.redo();
+            }
+
+            KeyCode::Char('z') if self.mode == Mode::Normal
                 && key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
                 self.undo();
-            }
-            KeyCode::Char('r') if self.mode == Mode::Normal
-                && key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
-                self.redo();
             }
 
             KeyCode::Char(c) if self.mode == Mode::FilenamePrompt => {
