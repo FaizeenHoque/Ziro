@@ -4,12 +4,10 @@ use std::cell::Cell;
 use std::time::Duration;
 
 use crossterm::event::{
-    self,
-    Event,
-    KeyCode,
-    KeyEventKind,
+    self, Event, KeyCode, KeyEventKind, MouseButton, MouseEvent, MouseEventKind,
 };
 
+use ratatui::layout::Rect;
 use ratatui::{
     DefaultTerminal,
     Frame,
@@ -43,6 +41,7 @@ pub struct App {
     pub filename_prompt: bool,
     pub show_explorer: bool,
 
+    pub explorer_area: Cell<Rect>,
     pub explorer_entries: Vec<FileEntry>,
     pub explorer_selected: usize,
     pub explorer_cwd: PathBuf,
@@ -104,6 +103,7 @@ impl Default for App {
             filename_prompt: false,
             show_explorer: false,
             
+            explorer_area: Cell::new(Rect::default()),
             explorer_entries: Vec::new(),
             explorer_selected: 0,
             explorer_cwd: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
@@ -201,20 +201,28 @@ impl App {
     fn handle_events(
         &mut self
     ) -> io::Result<()> {
-        if let Event::Key(key) = event::read()? {
-            if key.kind == KeyEventKind::Press {
+        match event::read()? {
+            Event::Key(key) if key.kind == KeyEventKind::Press => {
                 self.handle_key(key);
             }
+            Event::Mouse(mouse) => {
+                self.handle_mouse(mouse);
+            }
+            _=>{}
         }
-        
+
         while event::poll(Duration::from_millis(0))? {
-            if let Event::Key(key) = event::read()? {
-                if key.kind == KeyEventKind::Press {
+            match event::read()? {
+                Event::Key(key) if key.kind == KeyEventKind::Press => {
                     self.handle_key(key);
                 }
+                Event::Mouse(mouse) => {
+                    self.handle_mouse(mouse);
+                }
+                _=>{}
             }
         }
-        
+
         Ok(())
     }
     
@@ -371,6 +379,53 @@ impl App {
         }
 
         self.update_scroll(self.viewport_height.get());
+    }
+
+    fn handle_mouse(&mut self, mouse: MouseEvent) {
+        if !self.show_explorer {
+            return;
+        }
+
+        if let MouseEventKind::Down(MouseButton::Left) = mouse.kind {
+            let area = self.explorer_area.get();
+
+            let inside = mouse.column >= area.x
+                && mouse.column < area.x + area.width
+                && mouse.row >= area.y
+                && mouse.row < area.y + area.height;
+            
+            if !inside {
+                return;
+            }
+
+            let clicked_row = (mouse.row - area.y) as usize;
+
+            if clicked_row < self.explorer_entries.len() {
+                self.explorer_selected = clicked_row;
+                self.open_selected_entry();
+            }
+        }
+    }
+
+    fn open_selected_entry(&mut self) {
+        if let Some(entry) = self.explorer_entries.get(self.explorer_selected).clone() {
+            if entry.is_dir {
+                self.explorer_cwd = entry.path.clone();
+                self.refresh_explorer();
+            } else {
+                match Document::from_file(entry.path.to_str().unwrap_or_default()) {
+                    Ok(doc) => {
+                        self.document = doc;
+                        self.current_file = entry.path.to_string_lossy().to_string();
+                        self.last_saved = self.document.lines.clone();
+                        self.cursor.x = 0;
+                        self.cursor.y = 0;
+                        self.scroll_y = 0;
+                    }
+                    Err(_) => self.show_status("failed to open file".to_string()),
+                }
+            }
+        }
     }
 
     pub fn update_scroll(&mut self, viewport_height: usize) {

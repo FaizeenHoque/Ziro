@@ -34,6 +34,8 @@ fn render_explorer (app: &App, area: Rect, buf: &mut Buffer) {
         height: area.height,
     };
 
+    app.explorer_area.set(inner);
+
     let lines: Vec<Line> = app.explorer_entries.iter().enumerate().map(|(i, entry)| {
         let selected = i == app.explorer_selected;
         let style = if selected {
@@ -52,7 +54,6 @@ fn render_explorer (app: &App, area: Rect, buf: &mut Buffer) {
 
         Line::from(Span::styled(label, style))
     }).collect();
-
     Paragraph::new(lines).render(inner, buf);
 }
 
