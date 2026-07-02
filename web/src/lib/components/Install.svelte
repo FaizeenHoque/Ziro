@@ -5,12 +5,12 @@
 		{
 			label: 'Stable',
 			note: 'Prebuilt binary. No Rust required.',
-			cmd: 'curl -sSL https://raw.githubusercontent.com/FaizeenHoque/ziro/main/install.sh | bash'
+			cmd: 'curl -sSL https://ziro.faizeenhoque.dev/install.sh | bash'
 		},
 		{
 			label: 'Rolling',
 			note: 'Builds from latest main. Requires Cargo.',
-			cmd: 'curl -sSL https://raw.githubusercontent.com/FaizeenHoque/ziro/main/install-rolling.sh | bash'
+			cmd: 'curl -sSL https://ziro.faizeenhoque.dev/install-rolling.sh | bash'
 		}
 	];
 
