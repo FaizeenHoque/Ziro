@@ -29,7 +29,7 @@ impl Highlighter {
             .find_syntax_by_extension(file_path.split('.').last().unwrap_or("txt"))
             .unwrap_or_else(|| self.syntax_set.find_syntax_plain_text());
 
-        let theme = &self.theme_set.themes["Solarized (dark)"];
+        let theme = &self.theme_set.themes["base16-eighties.dark"];
         let mut highlighter = HighlightLines::new(syntax, theme);
 
         LinesWithEndings::from(content)

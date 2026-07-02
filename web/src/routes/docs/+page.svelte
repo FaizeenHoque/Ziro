@@ -10,6 +10,7 @@
 		{ id: 'installation', label: 'Installation' },
 		{ id: 'opening-files', label: 'Opening Files' },
 		{ id: 'file-explorer', label: 'File Explorer' },
+		{ id: 'tabs-and-saving', label: 'Tabs & Saving' },
 		{ id: 'keybindings', label: 'Keybindings' },
 		{ id: 'undo-redo', label: 'Undo & Redo' },
 		{ id: 'syntax-highlighting', label: 'Syntax Highlighting' }
@@ -157,6 +158,29 @@
 				</Callout>
 			</section>
 
+			<section id="tabs-and-saving" class="scroll-mt-28 mb-16">
+				<h2 class="font-mono text-[20px] tracking-tight mb-1">Tabs & Saving</h2>
+				<p class="text-[14px] text-[#5B5C52] mb-4">
+					Ziro keeps open files in a tab bar above the editor. Opening a file adds it to the bar,
+					clicking a tab switches to it, and closing the last tab returns you to a blank buffer.
+				</p>
+				<DocsTable
+					headers={['Feature', 'Behavior']}
+					rows={[
+						['`Tab bar`', 'Shows every open file, with the current file highlighted.'],
+						['`Click tab`', 'Switch to that file immediately.'],
+						['`Click x`', 'Close that file tab.'],
+						['`Unnamed save`', 'Pressing `Ctrl+S` on a blank buffer opens the filename popup.'],
+						['`Enter`', 'Confirms the filename and saves the file.'],
+						['`Esc`', 'Cancels the filename popup without saving.']
+					]}
+				/>
+				<Callout type="tip">
+					If you want to exit immediately, use <code>Ctrl+Alt+W</code>. <code>Ctrl+W</code>
+					closes the current tab instead.
+				</Callout>
+			</section>
+
 			<section id="keybindings" class="scroll-mt-28 mb-16">
 				<h2 class="font-mono text-[20px] tracking-tight mb-1">Keybindings</h2>
 				<p class="text-[14px] text-[#5B5C52] mb-4">
@@ -167,8 +191,8 @@
 					rows={[
 						['`Ctrl+E`', 'Open or close the file explorer.'],
 						['`Ctrl+S`', 'Save. Opens the filename popup if the buffer has no path yet.'],
-						['`Ctrl+W`', 'Quit. Refuses and shows a status message if there are unsaved changes.'],
-						['`Ctrl+Alt+W`', 'Force quit, discarding any unsaved changes.'],
+						['`Ctrl+W`', 'Close the current tab.'],
+						['`Ctrl+Alt+W`', 'Exit the editor immediately if the buffer is clean.'],
 						['`Ctrl+U`', 'Undo the last change.'],
 						['`Ctrl+R`', 'Redo the last undone change.'],
 						['`↑ ↓ ← →`', 'Move the cursor.'],
@@ -178,9 +202,8 @@
 					]}
 				/>
 				<Callout type="tip">
-					<code>Ctrl+W</code> won't let you lose work silently — if the buffer is
-					dirty it just shows a status message instead of quitting. Use
-					<code>Ctrl+Alt+W</code> if you actually want to discard changes.
+					<code>Ctrl+W</code> closes the current file tab. If you close the last tab,
+					Ziro drops back to a blank buffer instead of exiting.
 				</Callout>
 			</section>
 

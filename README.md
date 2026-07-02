@@ -61,6 +61,14 @@ curl -sSL https://ziro.faizeenhoque.dev/install-rolling.sh | bash
 * **Zero config to start.** Sane defaults. Customize when you want to, not before you can use it.
 * **Minimal resource usage.** A text editor should not need half your RAM.
 
+## editor features
+
+* **File explorer sidebar.** Browse folders in place and open files without leaving the editor.
+* **Tabbed files.** Open files stay in a tab bar for quick switching and closing.
+* **Filename prompt.** Saving an unnamed buffer opens a prompt so you can choose a path.
+* **Undo / redo.** Consecutive edits are grouped into practical undo steps.
+* **Status feedback.** Saves, cancels, and invalid actions surface in the status bar.
+
 ---
 
 ## stack
