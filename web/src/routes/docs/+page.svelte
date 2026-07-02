@@ -9,6 +9,7 @@
 	const sections = [
 		{ id: 'installation', label: 'Installation' },
 		{ id: 'opening-files', label: 'Opening Files' },
+		{ id: 'file-explorer', label: 'File Explorer' },
 		{ id: 'keybindings', label: 'Keybindings' },
 		{ id: 'undo-redo', label: 'Undo & Redo' },
 		{ id: 'syntax-highlighting', label: 'Syntax Highlighting' }
@@ -136,6 +137,26 @@
 				</p>
 			</section>
 
+			<section id="file-explorer" class="scroll-mt-28 mb-16">
+				<h2 class="font-mono text-[20px] tracking-tight mb-1">File Explorer</h2>
+				<p class="text-[14px] text-[#5B5C52] mb-4">
+					The explorer opens as a sidebar and keeps folder state inline instead of jumping between
+					directories. Click a folder to expand or collapse it. Click a file to load it in the editor.
+				</p>
+				<DocsTable
+					headers={['Key', 'Action']}
+					rows={[
+						['`Ctrl+E`', 'Toggle the file explorer sidebar.'],
+						['`Click folder`', 'Expand or collapse that folder in place.'],
+						['`Click file`', 'Open the file in the editor.']
+					]}
+				/>
+				<Callout type="note">
+					The editor shifts to the right while the explorer is open, so the cursor stays lined up
+					with the visible text area.
+				</Callout>
+			</section>
+
 			<section id="keybindings" class="scroll-mt-28 mb-16">
 				<h2 class="font-mono text-[20px] tracking-tight mb-1">Keybindings</h2>
 				<p class="text-[14px] text-[#5B5C52] mb-4">
@@ -144,6 +165,7 @@
 				<DocsTable
 					headers={['Key', 'Action']}
 					rows={[
+						['`Ctrl+E`', 'Open or close the file explorer.'],
 						['`Ctrl+S`', 'Save. Opens the filename popup if the buffer has no path yet.'],
 						['`Ctrl+W`', 'Quit. Refuses and shows a status message if there are unsaved changes.'],
 						['`Ctrl+Alt+W`', 'Force quit, discarding any unsaved changes.'],

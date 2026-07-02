@@ -117,7 +117,7 @@ impl Widget for &mut App {
             .map(|line| Line::from(line.spans))
             .collect();
 
-        let top_bar = Paragraph::new(format!(" {} ", self.current_file))
+        let top_bar = Paragraph::new(format!("Ziro @ {} ", self.current_file))
             .style(Style::new().fg(Color::DarkGray));
         top_bar.render(chunks[0], buf);
 
