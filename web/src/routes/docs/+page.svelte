@@ -78,12 +78,6 @@
 			<p class="font-mono text-[13px] text-[#1F7A4C] mb-3">docs</p>
 			<h1 class="font-mono text-[34px] tracking-tight mb-12">Everything you need to run Ziro.</h1>
 
-			<Callout type="warning">
-				Ziro is early. There is no modal editing yet — no Normal/Insert/Command
-				split. What's documented below is what's actually wired up in the
-				codebase today, not the roadmap.
-			</Callout>
-
 			<section id="installation" class="scroll-mt-28 mb-16 mt-12">
 				<h2 class="font-mono text-[20px] tracking-tight mb-1">Installation</h2>
 				<p class="text-[14px] text-[#5B5C52] mb-4">
@@ -141,26 +135,6 @@
 					If you open Ziro without a file, you'll start with a blank buffer. You'll be prompted
 					for a filename the first time you save.
 				</p>
-			</section>
-
-			<section id="modes" class="scroll-mt-28 mb-16">
-				<h2 class="font-mono text-[20px] tracking-tight mb-1">Modes</h2>
-				<p class="text-[14px] text-[#5B5C52] mb-4">
-					Ziro does not currently have a Vim-style Normal/Insert/Command split.
-					Typed characters insert directly wherever your cursor is — there's no
-					mode switch required, and none available yet.
-				</p>
-				<p class="text-[14px] text-[#5B5C52] mb-4">
-					The one exception is the <strong class="text-[#14140F]">filename prompt</strong>,
-					a popup that appears when you save a buffer that has no file path yet
-					(<code class="font-mono text-[13px] bg-[#F5F4EE] px-1.5 py-0.5 rounded">Ctrl+S</code>).
-					While it's open, typing edits the filename instead of the document.
-				</p>
-				<Callout type="warning">
-					A full modal system (Normal / Insert / Command, plus <code>:w</code>,
-					<code>:q</code>, <code>:wq</code>-style commands) is planned but not
-					implemented. If you see references to it elsewhere, they're aspirational.
-				</Callout>
 			</section>
 
 			<section id="keybindings" class="scroll-mt-28 mb-16">
