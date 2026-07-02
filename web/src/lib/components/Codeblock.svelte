@@ -17,7 +17,7 @@
 		}
 	}
 
-	const lines = code.split('\n');
+	let lines = $derived(code.split('\n'));
 </script>
 
 <div class="my-5 rounded-lg border border-[#E5E3D8] bg-[#14140F] overflow-hidden">

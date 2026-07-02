@@ -9,7 +9,6 @@
 	const sections = [
 		{ id: 'installation', label: 'Installation' },
 		{ id: 'opening-files', label: 'Opening Files' },
-		{ id: 'modes', label: 'Modes' },
 		{ id: 'keybindings', label: 'Keybindings' },
 		{ id: 'undo-redo', label: 'Undo & Redo' },
 		{ id: 'syntax-highlighting', label: 'Syntax Highlighting' }
