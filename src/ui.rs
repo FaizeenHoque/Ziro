@@ -116,7 +116,11 @@ fn render_explorer(app: &App, area: Rect, buf: &mut Buffer) {
             "  "
         };
 
-        let label = format!("{indent}{marker}{}", entry.name);
+        let icon = App::icon_for(&entry.path, entry.is_dir);
+        let label = format!(
+            "{indent}{marker}{icon} {}",
+            entry.name
+        );
         Line::from(Span::styled(label, style))
     }).collect();
 

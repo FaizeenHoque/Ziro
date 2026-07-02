@@ -577,6 +577,25 @@ impl App {
         }
     }
 
+    pub fn icon_for(path: &Path, is_dir: bool) -> &str {
+        if is_dir {
+            return "󰉋";
+        }
+
+        match path.extension().and_then(|e| e.to_str()) {
+            Some("rs") => "󱘗",
+            Some("toml") => "",
+            Some("json") => "",
+            Some("md") => "󰍔",
+            Some("txt") => "󰈙",
+            Some("png") | Some("jpg") | Some("jpeg") => "󰈟",
+            Some("svg") => "󰜡",
+            Some("lock") => "󰌾",
+            Some("gitignore") => "",
+            _ => "󰈔",
+        }
+    }
+
     fn expand_entry(&mut self, index: usize) {
         let (path, depth) = {
             let entry = &self.explorer_entries[index];
