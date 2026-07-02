@@ -56,11 +56,11 @@ impl Widget for &mut App {
                 Line::from(vec![
                     Span::styled(
                         format!("{:>4} ", self.scroll_y + i + 1),
-                        Style::new().fg(Color::DarkGray),
+                        Style::new().fg(Color::LightBlue),
                     ),
                 ])
             })
-            .collect();
+            .collect();   
 
         let content_lines: Vec<Line> = highlighted
             .into_iter()
@@ -80,14 +80,14 @@ impl Widget for &mut App {
         Paragraph::new(numbers).render(horizontal[0], buf);
         Paragraph::new(content_lines).render(horizontal[1], buf);
 
-        let status = format!("< STATUS > {}", self.status_text);
+        let status = format!("STATUS {}", self.status_text);
         Block::default()
             .style(bar_style)
             .render(chunks[2], buf);
         Paragraph::new(status).render(chunks[2], buf);
 
         // Filename popup
-        if self.mode == crate::mode::Mode::FilenamePrompt {
+        if self.filename_prompt == true {
             let popup_area = centered_rect(40, 5, area);
 
             Clear.render(popup_area, buf);

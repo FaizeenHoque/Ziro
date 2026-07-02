@@ -15,7 +15,7 @@ use ratatui::{
 };
 
 use crate::{
-    cursor::Cursor, document::{Document}, mode::Mode, syntax::Highlighter, ui,
+    cursor::Cursor, document::{Document}, syntax::Highlighter, ui,
 };
 
 
@@ -35,14 +35,14 @@ pub struct App {
 
     pub highlighter: Highlighter,
 
-    exit: bool,
-    pub mode: Mode,
     pub status_text: String,
-    pub command_input: String,
     pub current_file: String,
     pub last_saved: Vec<String>,
-    pending_quit_after_save: bool,
+    
+    pub filename_prompt: bool,
 
+    pending_quit_after_save: bool,
+    exit: bool,
     pub status: bool,
 }
 
@@ -73,23 +73,27 @@ impl Default for App {
         let last_saved = document.lines.clone();
         Self {
             document,
-            filename_input: String::new(),
-            cursor: Cursor::default(),
-            scroll_y: 0,
-            viewport_height: Cell::new(20),
-            highlighter: Highlighter::new(),
-            exit: false,
-            mode: Mode::default(),
-            status_text: String::new(),
-            command_input: String::new(),
             current_file: String::new(),
-            last_saved,
-            pending_quit_after_save: false,
-            status: false,
-            number_col_width: 6,
+            highlighter: Highlighter::new(),
+            cursor: Cursor::default(),
+
+            viewport_height: Cell::new(20),
+            number_col_width: 7,
+            scroll_y: 0,
+
+            filename_input: String::new(),
+            status_text: String::new(),
+
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
             last_action: ActionKind::None,
+            last_saved,
+            
+            filename_prompt: false,
+
+            pending_quit_after_save: false,
+            status: false,
+            exit: false,
         }
     }
 }
@@ -123,24 +127,23 @@ impl App {
         ui::draw(frame, self);
         let area = frame.area();
 
-        match self.mode {
-            Mode::FilenamePrompt => {
-                let popup_x = area.width.saturating_sub(40) / 2;
-                let popup_y = area.height.saturating_sub(5) / 2;
-                frame.set_cursor_position((
-                    popup_x + 1 + self.filename_input.len() as u16,
-                    popup_y + 2,
-                ));
-            }
-            _ => {
-                let x = self.number_col_width + self.cursor.x as u16;
-                let y = 1 + (self.cursor.y - self.scroll_y) as u16;
+        
 
-                frame.set_cursor_position((
-                    x.min(area.width.saturating_sub(1)),
-                    y.min(area.height.saturating_sub(2)),
-                ));
-            }
+        if self.filename_prompt == true  {
+            let popup_x = area.width.saturating_sub(40) / 2;
+            let popup_y = area.height.saturating_sub(5) / 2;
+            frame.set_cursor_position((
+                popup_x + 1 + self.filename_input.len() as u16,
+                popup_y + 2,
+            ));
+        } else {
+            let x = self.number_col_width + self.cursor.x as u16;
+            let y = 1 + (self.cursor.y - self.scroll_y) as u16;
+
+            frame.set_cursor_position((
+                x.min(area.width.saturating_sub(1)),
+                y.min(area.height.saturating_sub(2)),
+            ));
         }
     }
 
@@ -175,20 +178,19 @@ impl App {
         }
 
         match key.code {
-            KeyCode::Esc => {
+            KeyCode::Esc if self.filename_prompt == true => {
                 self.filename_input.clear();
                 self.pending_quit_after_save = false;
-                self.mode = Mode::Normal;
+                self.filename_prompt = false;
                 self.show_status("canceled file write".to_string());
             }
 
-            KeyCode::Char('w') if self.mode == Mode::Normal
-                && key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL)
+            KeyCode::Char('w') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL)
                 && key.modifiers.contains(crossterm::event::KeyModifiers::ALT) => {
                 self.exit = true;
             }
 
-            KeyCode::Char('w') if self.mode == Mode::Normal
+            KeyCode::Char('w') if self.filename_prompt != true
                 && key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
                 if self.is_dirty() {
                     self.show_status("file is unsaved".to_string());
@@ -197,7 +199,7 @@ impl App {
                 }
             }
 
-            KeyCode::Char('s') if self.mode == Mode::Normal
+            KeyCode::Char('s') if self.filename_prompt != true
                 && key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
                 self.pending_quit_after_save = false;
 
@@ -209,29 +211,29 @@ impl App {
                         self.show_status(format!("Saved to file: {}", &self.current_file));
                     }
                 } else {
-                    self.mode = Mode::FilenamePrompt;
+                    self.filename_prompt = true;
                     self.filename_input.clear();
                 }
             }
 
-            KeyCode::Char('z') if self.mode == Mode::Normal
+            KeyCode::Char('z') if self.filename_prompt != true
                 && key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL)
                 && key.modifiers.contains(crossterm::event::KeyModifiers::SHIFT) => {
                 self.redo();
             }
 
-            KeyCode::Char('z') if self.mode == Mode::Normal
+            KeyCode::Char('z') if self.filename_prompt != true
                 && key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
                 self.undo();
             }
 
-            KeyCode::Char(c) if self.mode == Mode::FilenamePrompt => {
+            KeyCode::Char(c) if self.filename_prompt == true => {
                 self.filename_input.push(c);
             }
-            KeyCode::Backspace if self.mode == Mode::FilenamePrompt => {
+            KeyCode::Backspace if self.filename_prompt == true => {
                 self.filename_input.pop();
             }
-            KeyCode::Enter if self.mode == Mode::FilenamePrompt => {
+            KeyCode::Enter if self.filename_prompt == true => {
                 if !self.filename_input.is_empty() {
                     self.current_file = self.filename_input.clone();
                     match self.document.save(&self.current_file) {
@@ -246,7 +248,7 @@ impl App {
                 }
                 self.filename_input.clear();
                 self.pending_quit_after_save = false;
-                self.mode = Mode::Normal;
+                self.filename_prompt = false;
             }
 
 

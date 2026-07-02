@@ -2,7 +2,6 @@
 mod app;
 mod cursor;
 mod document;
-mod mode;
 mod ui;
 mod syntax;
 

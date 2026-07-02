@@ -19,6 +19,11 @@ impl Highlighter {
     }
 
     pub fn highlight_lines(&self, content: &str, file_path: &str) -> Vec<Line<'static>> {
+
+        if content.is_empty() {
+            return vec![Line::from("")];
+        }
+
         let syntax = self
             .syntax_set
             .find_syntax_by_extension(file_path.split('.').last().unwrap_or("txt"))
@@ -37,7 +42,7 @@ impl Highlighter {
                     .into_iter()
                     .map(|(style, text)| {
                         Span::styled(
-                            text.to_string(), // FIX: own the string
+                            text.to_string(), 
                             Style::new().fg(ratatui::style::Color::Rgb(
                                 style.foreground.r,
                                 style.foreground.g,
