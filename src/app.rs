@@ -14,17 +14,19 @@ use ratatui::{
 };
 
 use crate::{
-    cursor::Cursor,
-    document::Document,
-    mode::Mode,
-    ui,
+    cursor::Cursor, document::{Document}, mode::Mode, ui,
 };
+
 
 #[derive(Debug)]
 pub struct App {
     pub document: Document,
     pub filename_input: String,
     pub cursor: Cursor,
+
+    pub undo_stack: Vec<UndoState>,
+    pub redo_stack: Vec<UndoState>,
+    pub last_action: ActionKind,
 
     pub scroll_y: usize,
     pub viewport_height: Cell<usize>,
@@ -35,16 +37,33 @@ pub struct App {
     pub status_text: String,
     pub command_input: String,
     pub current_file: String,
-    pub dirty: bool, 
+    pub last_saved: Vec<String>,
     pending_quit_after_save: bool,
 
-    pub warning: bool,
+    pub status: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct UndoState {
+    pub lines: Vec<String>,
+    pub cursor_x: usize,
+    pub cursor_y: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ActionKind {
+    None,
+    Insert,
+    Delete,
+    Newline,
 }
 
 impl Default for App {
     fn default() -> Self {
+        let document = Document::default();
+        let last_saved = document.lines.clone();
         Self {
-            document: Document::default(),
+            document,
             filename_input: String::new(),
             cursor: Cursor::default(),
             scroll_y: 0,
@@ -54,10 +73,13 @@ impl Default for App {
             status_text: String::new(),
             command_input: String::new(),
             current_file: String::new(),
-            dirty: false,
+            last_saved,
             pending_quit_after_save: false,
-            warning: false,
+            status: false,
             number_col_width: 6,
+            undo_stack: Vec::new(),
+            redo_stack: Vec::new(),
+            last_action: ActionKind::None,
         }
     }
 }
@@ -68,6 +90,7 @@ impl App {
         if let Some(filename) = file {
             app.current_file = filename.clone();
             app.document = Document::from_file(&filename)?;
+            app.last_saved = app.document.lines.clone();
         }
         Ok(app)
     }
@@ -84,16 +107,6 @@ impl App {
         }
 
         Ok(())
-    }
-
-    pub fn show_warning(&mut self, text: String) {
-        self.warning = true;
-        self.status_text = text;
-    }
-
-    pub fn reset_warning(&mut self) {
-        self.warning = false;
-        self.status_text = String::new();
     }
 
     fn draw(&mut self, frame: &mut Frame) {
@@ -136,186 +149,63 @@ impl App {
         Ok(())
     }
 
-    fn handle_key(&mut self, key: crossterm::event::KeyEvent,) {
-        if self.warning {
-            self.reset_warning();
+    pub fn is_dirty(&self) -> bool {
+        self.document.lines != self.last_saved
+    }
+
+    fn handle_key(&mut self, key: crossterm::event::KeyEvent) {
+        if self.status {
+            self.reset_status();
         }
 
         match key.code {
-
-            // Document Typing
-            KeyCode::Char(c) if self.mode == Mode::Insert => {
-                self.document.insert_char(
-                    self.cursor.x,
-                    self.cursor.y,
-                    c,
-                );
-
-                self.cursor.x += 1;
-                self.dirty = true;
-            }
-            KeyCode::Enter if self.mode == Mode::Insert => {
-                self.document.split_line(
-                    self.cursor.x,
-                    self.cursor.y,
-                );
-
-                self.cursor.y += 1;
-                self.cursor.x = 0;
-                self.dirty = true;
-            }
-            KeyCode::Backspace if self.mode == Mode::Insert => {
-                let (x, y) = self.document.backspace(
-                    self.cursor.x,
-                    self.cursor.y,
-                );
-
-                self.cursor.x = x;
-                self.cursor.y = y;
-                self.dirty = true;
-            }
-
-            // Document Movement Keybinds
-            KeyCode::Up if self.mode == Mode::Insert || self.mode == Mode::Normal => {
-                self.cursor.y = self.cursor.y.saturating_sub(1);
-
-                self.cursor.x = self.cursor.x
-                    .min(self.document.lines[self.cursor.y].len());
-            }
-            KeyCode::Down if self.mode == Mode::Insert || self.mode == Mode::Normal => {
-                if self.cursor.y + 1 < self.document.lines.len() {
-                    self.cursor.y += 1;
-
-                    self.cursor.x = self.cursor.x
-                        .min(self.document.lines[self.cursor.y].len());
-                }
-            }
-            KeyCode::Left if self.mode == Mode::Insert || self.mode == Mode::Normal => {
-                self.cursor.x = self.cursor.x.saturating_sub(1);
-            }
-            KeyCode::Right if self.mode == Mode::Insert || self.mode == Mode::Normal => {
-                let line_length = self.document.lines[self.cursor.y].len();
-
-                if self.cursor.x < line_length {
-                    self.cursor.x += 1;
-                }
-            }
-
-            KeyCode::Char('k') if self.mode == Mode::Normal => {
-                self.cursor.y = self.cursor.y.saturating_sub(1);
-
-                self.cursor.x = self.cursor.x
-                    .min(self.document.lines[self.cursor.y].len());
-            }
-            KeyCode::Char('j') if self.mode == Mode::Normal => {
-                if self.cursor.y + 1 < self.document.lines.len() {
-                    self.cursor.y += 1;
-
-                    self.cursor.x = self.cursor.x
-                        .min(self.document.lines[self.cursor.y].len());
-                }
-            }
-            KeyCode::Char('h') if self.mode == Mode::Normal => {
-                self.cursor.x = self.cursor.x.saturating_sub(1);
-            }
-            KeyCode::Char('l') if self.mode == Mode::Normal => {
-                let line_length = self.document.lines[self.cursor.y].len();
-
-                if self.cursor.x < line_length {
-                    self.cursor.x += 1;
-                }
-            }
-
-            // Command Mode Keybinds
-            KeyCode::Char(c) if self.mode == Mode::Command => {
-                self.command_input.push(c);
-            }
-            KeyCode::Backspace if self.mode == Mode::Command => {
-                self.command_input.pop();
-            }
-            KeyCode::Enter if self.mode == Mode::Command => {
-                match self.command_input.as_str() {
-                    ":q" => {
-                        if self.dirty {
-                            self.show_warning("file is unsaved".to_string());
-                        } else {
-                            self.exit = true;
-                        }
-                    }
-                    ":!q" | ":q!" => {
-                        self.exit = true;
-                    }
-                    ":w" => {
-                        self.pending_quit_after_save = false;
-
-                        if !self.current_file.is_empty() {
-                            if let Err(_) = self.document.save(&self.current_file) {
-                                self.show_warning("file does not exist".to_string());
-                            } else {
-                                self.dirty = false;
-                            }
-                        } else {
-                            self.mode = Mode::FilenamePrompt;
-                            self.filename_input.clear();
-                        }
-                    }
-                    ":wq" | ":x" => {
-                        self.pending_quit_after_save = false;
-
-                        if !self.current_file.is_empty() {
-                            match self.document.save(&self.current_file) {
-                                Ok(()) => {
-                                    self.dirty = false;
-                                    self.exit = true;
-                                }
-                                Err(_) => {
-                                    self.show_warning("failed to save file".to_string());
-                                }
-                            }
-                        } else {
-                            self.pending_quit_after_save = true;
-                            self.mode = Mode::FilenamePrompt;
-                            self.filename_input.clear();
-                        }
-                    }
-                    _ => {}
-                }
-
-                self.command_input.clear();
-                if self.mode == Mode::Command {
-                    self.mode = Mode::Normal;
-                }
-            }
-
-            // Mode Switching
             KeyCode::Esc => {
-                if self.mode == Mode::FilenamePrompt {
-                    self.filename_input.clear();
-                    self.pending_quit_after_save = false;
-                    self.mode = Mode::Normal;
-                    self.show_warning("canceled file write".to_string());
-                } else {
-                    self.mode = match self.mode {
-                        Mode::Normal => Mode::Normal,
-                        Mode::Insert => Mode::Normal,
-                        Mode::Command => Mode::Normal,
-                        Mode::FilenamePrompt => Mode::FilenamePrompt,
-                    };
+                self.filename_input.clear();
+                self.pending_quit_after_save = false;
+                self.mode = Mode::Normal;
+                self.show_status("canceled file write".to_string());
+            }
 
-                    self.command_input.clear();   
+            KeyCode::Char('w') if self.mode == Mode::Normal
+                && key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL)
+                && key.modifiers.contains(crossterm::event::KeyModifiers::ALT) => {
+                self.exit = true;
+            }
+
+            KeyCode::Char('w') if self.mode == Mode::Normal
+                && key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                if self.is_dirty() {
+                    self.show_status("file is unsaved".to_string());
+                } else {
+                    self.exit = true;
                 }
             }
-            
-            KeyCode::Char('i') if self.mode == Mode::Normal => {
-                self.mode = Mode::Insert;
+
+            KeyCode::Char('s') if self.mode == Mode::Normal
+                && key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                self.pending_quit_after_save = false;
+
+                if !self.current_file.is_empty() {
+                    if let Err(_) = self.document.save(&self.current_file) {
+                        self.show_status("file does not exist".to_string());
+                    } else {
+                        self.last_saved = self.document.lines.clone();
+                        self.show_status(format!("Saved to file: {}", &self.current_file));
+                    }
+                } else {
+                    self.mode = Mode::FilenamePrompt;
+                    self.filename_input.clear();
+                }
             }
 
-            KeyCode::Char(':') if self.mode == Mode::Normal => {
-                self.mode = Mode::Command;
-                self.command_input = ":".to_string();
+            KeyCode::Char('u') if self.mode == Mode::Normal
+                && key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                self.undo();
             }
-
-
+            KeyCode::Char('r') if self.mode == Mode::Normal
+                && key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                self.redo();
+            }
 
             KeyCode::Char(c) if self.mode == Mode::FilenamePrompt => {
                 self.filename_input.push(c);
@@ -328,19 +218,81 @@ impl App {
                     self.current_file = self.filename_input.clone();
                     match self.document.save(&self.current_file) {
                         Ok(()) => {
-                            self.dirty = false;
-
+                            self.last_saved = self.document.lines.clone();
                             if self.pending_quit_after_save {
                                 self.exit = true;
                             }
                         }
-                        Err(_) => { self.show_warning("failed to save".to_string()); }
+                        Err(_) => { self.show_status("failed to save".to_string()); }
                     }
                 }
                 self.filename_input.clear();
                 self.pending_quit_after_save = false;
                 self.mode = Mode::Normal;
             }
+
+            // --- Generic typing / movement arms AFTER ---
+
+            KeyCode::Char(c) => {
+                let at_word_start = c.is_whitespace()
+                    || self.cursor.x == 0
+                    || self
+                        .document
+                        .lines[self.cursor.y]
+                        .chars()
+                        .nth(self.cursor.x - 1)
+                        .map(|prev| prev.is_whitespace())
+                        .unwrap_or(true);
+
+
+                if self.last_action != ActionKind::Insert || (at_word_start && !c.is_whitespace()) {
+                    self.push_undo();
+                }
+
+                self.document.insert_char(self.cursor.x, self.cursor.y, c);
+                self.cursor.x += 1;
+                self.last_action = ActionKind::Insert;
+            }
+            KeyCode::Enter => {
+                self.push_undo();
+                self.document.split_line(self.cursor.x, self.cursor.y);
+                self.cursor.y += 1;
+                self.cursor.x = 0;
+                self.last_action = ActionKind::Newline;
+            }
+            KeyCode::Backspace => {
+                if self.last_action != ActionKind::Delete {
+                    self.push_undo();
+                }
+                let (x, y) = self.document.backspace(self.cursor.x, self.cursor.y);
+                self.cursor.x = x;
+                self.cursor.y = y;
+                self.last_action = ActionKind::Delete;
+            }
+            KeyCode::Up => {
+                self.cursor.y = self.cursor.y.saturating_sub(1);
+                self.cursor.x = self.cursor.x.min(self.document.lines[self.cursor.y].len());
+                self.last_action = ActionKind::None;
+            }
+            KeyCode::Down => {
+                if self.cursor.y + 1 < self.document.lines.len() {
+                    self.cursor.y += 1;
+                    self.cursor.x = self.cursor.x.min(self.document.lines[self.cursor.y].len());
+                }
+                self.last_action = ActionKind::None;
+            }
+            KeyCode::Left => {
+                self.cursor.x = self.cursor.x.saturating_sub(1);
+                self.last_action = ActionKind::None;
+            }
+            KeyCode::Right => {
+                let line_length = self.document.lines[self.cursor.y].len();
+                if self.cursor.x < line_length {
+                    self.cursor.x += 1;
+                }
+                self.last_action = ActionKind::None;
+            }
+
             _ => {}
         }
 
@@ -356,4 +308,51 @@ impl App {
             self.scroll_y = self.cursor.y - viewport_height + 1;
         }
     }
+
+    pub fn show_status(&mut self, text: String) {
+        self.status = true;
+        self.status_text = text;
+    }
+
+    pub fn reset_status(&mut self) {
+        self.status = false;
+        self.status_text = String::new();
+    }
+
+    fn snapshot(&self) -> UndoState {
+        UndoState { lines: self.document.lines.clone(), cursor_x: self.cursor.x, cursor_y: self.cursor.y }
+    }
+
+    pub fn push_undo(&mut self) {
+        self.undo_stack.push(self.snapshot());
+        self.redo_stack.clear();
+    }
+
+    pub fn undo(&mut self) {
+        match self.undo_stack.pop() {
+            Some(state) => {
+                self.redo_stack.push(self.snapshot());
+                self.document.lines = state.lines;
+                self.cursor.x = state.cursor_x;
+                self.cursor.y = state.cursor_y;
+                self.last_action = ActionKind::None;
+            }
+            None => self.show_status("nothing to undo".to_string()),
+        }
+    }
+
+    pub fn redo(&mut self) {
+        match self.redo_stack.pop() {
+            Some(state) => {
+                self.undo_stack.push(self.snapshot());
+                self.document.lines = state.lines;
+                self.cursor.x = state.cursor_x;
+                self.cursor.y = state.cursor_y;
+                self.last_action = ActionKind::None;
+            }
+            None => self.show_status("nothing to redo".to_string()),
+        }
+    }
+
+
 }

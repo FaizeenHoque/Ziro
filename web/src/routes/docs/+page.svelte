@@ -10,9 +10,8 @@
 		{ id: 'installation', label: 'Installation' },
 		{ id: 'opening-files', label: 'Opening Files' },
 		{ id: 'modes', label: 'Modes' },
-		{ id: 'switching-modes', label: 'Switching Modes' },
-		{ id: 'navigation', label: 'Navigation' },
-		{ id: 'commands', label: 'Commands' },
+		{ id: 'keybindings', label: 'Keybindings' },
+		{ id: 'undo-redo', label: 'Undo & Redo' },
 		{ id: 'syntax-highlighting', label: 'Syntax Highlighting' }
 	];
 
@@ -41,7 +40,7 @@
 
 <svelte:head>
 	<title>Docs — Ziro</title>
-	<meta name="description" content="Installation, modes, navigation, and commands for Ziro." />
+	<meta name="description" content="Installation, keybindings, and behavior for Ziro." />
 </svelte:head>
 
 <div class="bg-[#FCFCFA] min-h-screen font-sans text-[#14140F]">
@@ -79,7 +78,13 @@
 			<p class="font-mono text-[13px] text-[#1F7A4C] mb-3">docs</p>
 			<h1 class="font-mono text-[34px] tracking-tight mb-12">Everything you need to run Ziro.</h1>
 
-			<section id="installation" class="scroll-mt-28 mb-16">
+			<Callout type="warning">
+				Ziro is early. There is no modal editing yet — no Normal/Insert/Command
+				split. What's documented below is what's actually wired up in the
+				codebase today, not the roadmap.
+			</Callout>
+
+			<section id="installation" class="scroll-mt-28 mb-16 mt-12">
 				<h2 class="font-mono text-[20px] tracking-tight mb-1">Installation</h2>
 				<p class="text-[14px] text-[#5B5C52] mb-4">
 					Ziro is currently only supported on <strong class="text-[#14140F]">Linux</strong>.
@@ -134,88 +139,90 @@
 				/>
 				<p class="text-[14px] text-[#5B5C52]">
 					If you open Ziro without a file, you'll start with a blank buffer. You'll be prompted
-					for a filename when you save.
+					for a filename the first time you save.
 				</p>
 			</section>
 
 			<section id="modes" class="scroll-mt-28 mb-16">
 				<h2 class="font-mono text-[20px] tracking-tight mb-1">Modes</h2>
 				<p class="text-[14px] text-[#5B5C52] mb-4">
-					Ziro uses a modal editing system, similar to Vim. There are three modes:
+					Ziro does not currently have a Vim-style Normal/Insert/Command split.
+					Typed characters insert directly wherever your cursor is — there's no
+					mode switch required, and none available yet.
 				</p>
-				<DocsTable
-					headers={['Mode', 'Description']}
-					rows={[
-						['Normal', 'Navigate the file. Default mode on startup.'],
-						['Insert', 'Type and edit text.'],
-						['Command', 'Run commands like save and quit.']
-					]}
-				/>
-				<Callout type="tip">
-					If you're lost, press <code>Esc</code>. It always takes you back to Normal mode.
+				<p class="text-[14px] text-[#5B5C52] mb-4">
+					The one exception is the <strong class="text-[#14140F]">filename prompt</strong>,
+					a popup that appears when you save a buffer that has no file path yet
+					(<code class="font-mono text-[13px] bg-[#F5F4EE] px-1.5 py-0.5 rounded">Ctrl+S</code>).
+					While it's open, typing edits the filename instead of the document.
+				</p>
+				<Callout type="warning">
+					A full modal system (Normal / Insert / Command, plus <code>:w</code>,
+					<code>:q</code>, <code>:wq</code>-style commands) is planned but not
+					implemented. If you see references to it elsewhere, they're aspirational.
 				</Callout>
 			</section>
 
-			<section id="switching-modes" class="scroll-mt-28 mb-16">
-				<h2 class="font-mono text-[20px] tracking-tight mb-1">Switching Modes</h2>
-				<DocsTable
-					headers={['Key', 'From', 'To']}
-					rows={[
-						['`i`', 'Normal', 'Insert'],
-						['`Esc`', 'Insert', 'Normal'],
-						['`:`', 'Normal', 'Command'],
-						['`Esc` or `Enter`', 'Command', 'Normal']
-					]}
-				/>
-			</section>
-
-			<section id="navigation" class="scroll-mt-28 mb-16">
-				<h2 class="font-mono text-[20px] tracking-tight mb-1">Navigation</h2>
-				<p class="text-[14px] text-[#5B5C52] mb-4">Arrow keys work in both Normal and Insert mode.</p>
+			<section id="keybindings" class="scroll-mt-28 mb-16">
+				<h2 class="font-mono text-[20px] tracking-tight mb-1">Keybindings</h2>
+				<p class="text-[14px] text-[#5B5C52] mb-4">
+					These work anywhere in the document (not mode-gated), except where noted.
+				</p>
 				<DocsTable
 					headers={['Key', 'Action']}
 					rows={[
-						['`↑`', 'Move up'],
-						['`↓`', 'Move down'],
-						['`←`', 'Move left'],
-						['`→`', 'Move right']
+						['`Ctrl+S`', 'Save. Opens the filename popup if the buffer has no path yet.'],
+						['`Ctrl+W`', 'Quit. Refuses and shows a status message if there are unsaved changes.'],
+						['`Ctrl+Alt+W`', 'Force quit, discarding any unsaved changes.'],
+						['`Ctrl+U`', 'Undo the last change.'],
+						['`Ctrl+R`', 'Redo the last undone change.'],
+						['`↑ ↓ ← →`', 'Move the cursor.'],
+						['`Enter`', 'Insert a newline, splitting the current line.'],
+						['`Backspace`', 'Delete the character before the cursor.'],
+						['`Esc`', 'Cancel the filename popup (only active while it\'s open).']
 					]}
 				/>
+				<Callout type="tip">
+					<code>Ctrl+W</code> won't let you lose work silently — if the buffer is
+					dirty it just shows a status message instead of quitting. Use
+					<code>Ctrl+Alt+W</code> if you actually want to discard changes.
+				</Callout>
 			</section>
 
-			<section id="commands" class="scroll-mt-28 mb-16">
-				<h2 class="font-mono text-[20px] tracking-tight mb-1">Commands</h2>
+			<section id="undo-redo" class="scroll-mt-28 mb-16">
+				<h2 class="font-mono text-[20px] tracking-tight mb-1">Undo & Redo</h2>
 				<p class="text-[14px] text-[#5B5C52] mb-4">
-					Enter Command mode with <code class="font-mono text-[13px] bg-[#F5F4EE] px-1.5 py-0.5 rounded">:</code>
-					from Normal mode, then type a command and press <code class="font-mono text-[13px] bg-[#F5F4EE] px-1.5 py-0.5 rounded">Enter</code>.
+					Ziro snapshots the full buffer and cursor position before each edit,
+					not per-keystroke. Consecutive character insertions and consecutive
+					backspaces are grouped into a single undo step; typing a word and
+					then deleting it are still two separate steps.
 				</p>
 				<DocsTable
-					headers={['Command', 'Action']}
+					headers={['Key', 'Action']}
 					rows={[
-						['`:w`', 'Save the current file'],
-						['`:q`', 'Quit (warns if unsaved changes exist)'],
-						['`:!q`', 'Force quit without saving'],
-						['`:wq`', 'Save and quit'],
-						['`:x`', 'Save and quit (same as `:wq`)']
+						['`Ctrl+U`', 'Undo'],
+						['`Ctrl+R`', 'Redo']
 					]}
 				/>
-				<Callout type="warning">
-					<code>:q</code> will refuse to close if you have unsaved changes. Use <code>:!q</code>
-					to force quit and discard them, or <code>:wq</code> to save first.
+				<Callout type="note">
+					Redo history is cleared as soon as you make a new edit after undoing —
+					same behavior you'd expect from any standard editor.
 				</Callout>
 			</section>
 
 			<section id="syntax-highlighting" class="scroll-mt-28">
 				<h2 class="font-mono text-[20px] tracking-tight mb-1">Syntax Highlighting</h2>
 				<p class="text-[14px] text-[#5B5C52] mb-4">
-					Ziro automatically detects the language from the file extension and applies syntax
-					highlighting. Supported languages include anything syntect supports out of the box:
-					Rust, Python, JavaScript, TypeScript, Go, C, C++, HTML, CSS, JSON, TOML, Markdown, and
-					more.
+					Ziro detects the language from the file's extension and applies syntax
+					highlighting via <code class="font-mono text-[13px] bg-[#F5F4EE] px-1.5 py-0.5 rounded">syntect</code>,
+					using the Solarized (dark) theme. Supported languages include anything
+					syntect ships by default: Rust, Python, JavaScript, TypeScript, Go, C,
+					C++, HTML, CSS, JSON, TOML, Markdown, and more.
 				</p>
 				<Callout type="note">
-					If you open Ziro without a filename, syntax highlighting won't activate until you save
-					the file with a name.
+					If you open Ziro without a filename, there's no extension to detect —
+					highlighting falls back to plain text until you save the buffer with
+					a real name.
 				</Callout>
 			</section>
 		</div>
