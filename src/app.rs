@@ -1,5 +1,6 @@
 use std::io;
 use std::cell::Cell;
+use std::time::Duration;
 
 use crossterm::event::{
     self,
@@ -14,7 +15,7 @@ use ratatui::{
 };
 
 use crate::{
-    cursor::Cursor, document::{Document}, mode::Mode, ui,
+    cursor::Cursor, document::{Document}, mode::Mode, syntax::Highlighter, ui,
 };
 
 
@@ -31,6 +32,8 @@ pub struct App {
     pub scroll_y: usize,
     pub viewport_height: Cell<usize>,
     pub number_col_width: u16,
+
+    pub highlighter: Highlighter,
 
     exit: bool,
     pub mode: Mode,
@@ -58,6 +61,12 @@ pub enum ActionKind {
     Newline,
 }
 
+impl std::fmt::Debug for Highlighter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Highlighter").finish()
+    }
+}
+
 impl Default for App {
     fn default() -> Self {
         let document = Document::default();
@@ -68,6 +77,7 @@ impl Default for App {
             cursor: Cursor::default(),
             scroll_y: 0,
             viewport_height: Cell::new(20),
+            highlighter: Highlighter::new(),
             exit: false,
             mode: Mode::default(),
             status_text: String::new(),
@@ -123,14 +133,17 @@ impl App {
                 ));
             }
             _ => {
+                let x = self.number_col_width + self.cursor.x as u16;
+                let y = 1 + (self.cursor.y - self.scroll_y) as u16;
+
                 frame.set_cursor_position((
-                    self.cursor.x as u16 + self.number_col_width,
-                    (self.cursor.y - self.scroll_y) as u16,
+                    x.min(area.width.saturating_sub(1)),
+                    y.min(area.height.saturating_sub(2)),
                 ));
             }
         }
     }
-    
+
 
     fn handle_events(
         &mut self
@@ -140,6 +153,15 @@ impl App {
                 self.handle_key(key);
             }
         }
+
+        while event::poll(Duration::from_millis(0))? {
+            if let Event::Key(key) = event::read()? {
+                if key.kind == KeyEventKind::Press {
+                    self.handle_key(key);
+                }
+            }
+        }
+
         Ok(())
     }
 
@@ -348,6 +370,5 @@ impl App {
             None => self.show_status("nothing to redo".to_string()),
         }
     }
-
 
 }
