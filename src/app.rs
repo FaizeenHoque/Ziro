@@ -114,12 +114,6 @@ impl App {
         let area = frame.area();
 
         match self.mode {
-            Mode::Command => {
-                frame.set_cursor_position((
-                    self.command_input.len() as u16,
-                    area.height - 1,
-                ));
-            }
             Mode::FilenamePrompt => {
                 let popup_x = area.width.saturating_sub(40) / 2;
                 let popup_y = area.height.saturating_sub(5) / 2;
@@ -233,7 +227,6 @@ impl App {
                 self.mode = Mode::Normal;
             }
 
-            // --- Generic typing / movement arms AFTER ---
 
             KeyCode::Char(c) => {
                 let at_word_start = c.is_whitespace()
