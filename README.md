@@ -47,7 +47,7 @@ curl -sSL https://ziro.faizeenhoque.dev/install-rolling.sh | bash
 > [!WARNING]
 > Both scripts require `sudo` to move the binary to `/usr/local/bin`. Read the script before running if you're cautious about piping curl to bash.
 
-→ **[Full usage guide and keybinds](https://github.com/FaizeenHoque/Ziro/wiki)**
+→ **[Full usage guide and keybinds](https://ziro.faizeenhoque.dev/docs/)**
 
 ---
 

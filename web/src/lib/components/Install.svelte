@@ -63,7 +63,7 @@
 		</div>
 
 		<a
-			href="https://github.com/FaizeenHoque/Ziro/wiki"
+			href="https://ziro.faizeenhoque.dev/docs/"
 			target="_blank"
 			rel="noreferrer"
 			class="inline-block mt-8 font-mono text-[13px] text-[#5B5C52] hover:text-[#14140F] underline underline-offset-4 decoration-[#E5E3D8] transition-colors"
