@@ -32,13 +32,13 @@ Ziro is the editor that should have existed already — lightweight, instant, an
 **Stable** — prebuilt binary, no Rust required:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/FaizeenHoque/ziro/main/install.sh | bash
+curl -sSL https://ziro.faizeenhoque.dev/install.sh | bash
 ```
 
 **Rolling** — builds from latest main, requires Cargo:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/FaizeenHoque/ziro/main/install-rolling.sh | bash
+curl -sSL https://ziro.faizeenhoque.dev/install-rolling.sh | bash
 ```
 
 > [!NOTE]

@@ -99,7 +99,7 @@
 				<p class="text-[14px] text-[#5B5C52]">Downloads a prebuilt binary. No Rust required.</p>
 				<CodeBlock
 					label="bash"
-					code={`curl -sSL https://raw.githubusercontent.com/FaizeenHoque/ziro/main/install.sh | bash`}
+					code={`curl -sSL https://ziro.faizeenhoque.dev/install.sh | bash`}
 				/>
 
 				<h3 class="font-mono text-[15px] mt-8 mb-1">Rolling</h3>
@@ -108,7 +108,7 @@
 				</p>
 				<CodeBlock
 					label="bash"
-					code={`curl -sSL https://raw.githubusercontent.com/FaizeenHoque/ziro/main/install-rolling.sh | bash`}
+					code={`curl -sSL https://ziro.faizeenhoque.dev/install-rolling.sh | bash`}
 				/>
 
 				<Callout type="note">
