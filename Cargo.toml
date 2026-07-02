@@ -1,6 +1,6 @@
 [package]
 name = "ziro"
-version = "0.1.5"
+version = "1.2.2"
 description = "The better text editor"
 authors = ["Faizeen Hoque <me@faizeenhoque.dev>"]
 license = "MIT"
