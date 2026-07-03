@@ -74,93 +74,6 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     frame.render_widget(app, frame.area());
 }
 
-fn centered_rect(width: u16, height: u16, area: Rect) -> Rect {
-    Rect {
-        x: area.width.saturating_sub(width) / 2,
-        y: area.height.saturating_sub(height) / 2,
-        width: width.min(area.width),
-        height: height.min(area.height),
-    }
-}
-
-fn render_explorer(app: &App, area: Rect, buf: &mut Buffer) {
-    Block::new()
-        .title("Explorer")
-        .borders(Borders::ALL)
-        .style(Style::new().bg(BG_SIDEBAR).fg(FG_MUTED))
-        .render(area, buf);
-
-    let inner = Rect {
-        x: area.x + 2,
-        y: area.y + 1,
-        width: area.width.saturating_sub(3),
-        height: area.height.saturating_sub(2),
-    };
-
-    app.explorer_area.set(inner);
-
-    let lines: Vec<Line> = app.explorer_entries.iter().enumerate().map(|(i, entry)| {
-        let selected = i == app.explorer_selected;
-        let style = if selected {
-            Style::new().bg(SELECTED_BG).fg(Color::White)
-        } else if entry.is_dir {
-            Style::new().bg(BG_SIDEBAR).fg(FG_DIR)
-        } else {
-            Style::new().bg(BG_SIDEBAR).fg(FG_DEFAULT)
-        };
-
-        let indent = "  ".repeat(entry.depth);
-        let marker = if entry.is_dir {
-            if entry.expanded { "v " } else { "> " }
-        } else {
-            "  "
-        };
-
-        let label = format!("{indent}{marker}{}", entry.name);
-        Line::from(Span::styled(label, style))
-    }).collect();
-
-    Paragraph::new(lines)
-        .style(Style::new().bg(BG_SIDEBAR))
-        .render(inner, buf);
-}
-
-fn render_tabs(app: &App, area: Rect, buf: &mut Buffer) {
-    Block::new().style(Style::new().bg(BG_TABBAR)).render(area, buf);
-    app.tabs_area.set(area);
-
-    let mut x = area.x;
-    for tab in &app.tabs_list {
-        let active = tab.path.to_string_lossy() == app.current_file;
-        let style = if active {
-            Style::new().bg(BG_TAB_ACTIVE).fg(Color::White)
-        } else {
-            Style::new().bg(BG_TAB_INACTIVE).fg(FG_MUTED)
-        };
-        let label = format!(" {} x ", tab.name);
-        let width = label.len() as u16;
-        if x + width > area.x + area.width { break; }
-
-        Paragraph::new(label).style(style).render(
-            Rect { x, y: area.y, width, height: 1 }, buf
-        );
-        if active {
-            for cx in x..x + width {
-                if let Some(cell) = buf.cell_mut((cx, area.y)) {
-                    cell.set_style(Style::new().bg(BG_TAB_ACTIVE).fg(FG_ACCENT));
-                }
-            }
-        }
-        x += width;
-    }
-
-    if x < area.x + area.width {
-        Paragraph::new("")
-            .style(Style::new().bg(BG_TABBAR))
-            .render(Rect { x, y: area.y, width: area.x + area.width - x, height: 1 }, buf);
-    }
-}
-
 impl Widget for &mut App {
     fn render(self, area: ratatui::layout::Rect, buf: &mut Buffer) {
 
@@ -279,5 +192,102 @@ impl Widget for &mut App {
                 .style(Style::new().bg(BG_POPUP).fg(FG_DEFAULT))
                 .render(inner, buf);
         }
+    }
+}
+
+fn render_explorer(app: &App, area: Rect, buf: &mut Buffer) {
+    Block::new()
+        .title("Explorer")
+        .borders(Borders::ALL)
+        .style(Style::new().bg(BG_SIDEBAR).fg(FG_MUTED))
+        .render(area, buf);
+
+    let inner = Rect {
+        x: area.x + 2,
+        y: area.y + 1,
+        width: area.width.saturating_sub(3),
+        height: area.height.saturating_sub(2),
+    };
+
+    app.explorer_area.set(inner);
+
+    let lines: Vec<Line> = app.explorer_entries.iter().enumerate().map(|(i, entry)| {
+        let selected = i == app.explorer_selected;
+        let is_drag_target = app.dragging_entry.is_some() && app.entry_drag_target == Some(i);
+        let style = if is_drag_target {
+            Style::new().bg(SELECTED_BG).fg(FG_ACCENT)
+        } else if selected {
+            Style::new().bg(SELECTED_BG).fg(Color::White)
+        } else if entry.is_dir {
+            Style::new().bg(BG_SIDEBAR).fg(FG_DIR)
+        } else {
+            Style::new().bg(BG_SIDEBAR).fg(FG_DEFAULT)
+        };
+
+        let indent = "  ".repeat(entry.depth);
+        let marker = if entry.is_dir {
+            if entry.expanded { "v " } else { "> " }
+        } else {
+            "  "
+        };
+
+        let icon = App::icon_for(&entry.path, entry.is_dir);
+        let label = format!(
+            "{indent}{marker}{icon} {}",
+            entry.name
+        );
+        Line::from(Span::styled(label, style))
+    }).collect();
+
+    Paragraph::new(lines)
+        .style(Style::new().bg(BG_SIDEBAR))
+        .render(inner, buf);
+}
+
+fn render_tabs(app: &App, area: Rect, buf: &mut Buffer) {
+    Block::new().style(Style::new().bg(BG_TABBAR)).render(area, buf);
+    app.tabs_area.set(area);
+
+    let mut x = area.x;
+    for (i, tab) in app.tabs_list.iter().enumerate() {
+        let active = tab.path.to_string_lossy() == app.current_file;
+        let is_drag_target = app.dragging_tab.is_some() && app.tab_drag_target == Some(i);
+        let style = if is_drag_target {
+            Style::new().bg(SELECTED_BG).fg(FG_ACCENT)
+        } else if active {
+            Style::new().bg(BG_TAB_ACTIVE).fg(Color::White)
+        } else {
+            Style::new().bg(BG_TAB_INACTIVE).fg(FG_MUTED)
+        };
+        let label = format!(" {} x ", tab.name);
+        let width = label.len() as u16;
+        if x + width > area.x + area.width { break; }
+
+        Paragraph::new(label).style(style).render(
+            Rect { x, y: area.y, width, height: 1 }, buf
+        );
+        if active {
+            for cx in x..x + width {
+                if let Some(cell) = buf.cell_mut((cx, area.y)) {
+                    cell.set_style(Style::new().bg(BG_TAB_ACTIVE).fg(FG_ACCENT));
+                }
+            }
+        }
+        x += width;
+    }
+
+    if x < area.x + area.width {
+        Paragraph::new("")
+            .style(Style::new().bg(BG_TABBAR))
+            .render(Rect { x, y: area.y, width: area.x + area.width - x, height: 1 }, buf);
+    }
+}
+
+fn centered_rect(width: u16, height: u16, area: Rect) -> Rect {
+    Rect {
+        x: area.width.saturating_sub(width) / 2,
+        y: area.height.saturating_sub(height) / 2,
+        width: width.min(area.width),
+        height: height.min(area.height),
     }
 }

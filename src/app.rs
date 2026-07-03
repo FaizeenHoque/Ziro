@@ -1,3 +1,4 @@
+use std::fmt::format;
 use std::fs::File;
 use std::path::Path;
 use std::{io, path::PathBuf};
@@ -50,6 +51,12 @@ pub struct App {
 
     pub tabs_area: Cell<Rect>,
     pub tabs_list: Vec<TabItem>,
+
+    pub dragging_tab: Option<usize>,
+    pub tab_drag_target: Option<usize>,
+
+    pub dragging_entry: Option<usize>,
+    pub entry_drag_target: Option<usize>,
     
     pub pending_quit_after_save: bool,
     pub exit: bool,
@@ -59,6 +66,8 @@ pub struct App {
 pub struct TabItem {
     pub name: String,
     pub path: PathBuf,
+    pub cursor: Cursor,
+    pub scroll_y: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -125,6 +134,12 @@ impl Default for App {
             tabs_area: Cell::new(Rect::default()),
             tabs_list: Vec::new(),
 
+            dragging_tab: None,
+            tab_drag_target: None,
+
+            dragging_entry: None,
+            entry_drag_target: None,
+
             pending_quit_after_save: false,
             status: false,
             exit: false,
@@ -135,84 +150,16 @@ impl Default for App {
 pub const EXPLORER_WIDTH: u16 = 40;
 
 impl App {
-
-    fn switch_to_file(&mut self, path: &Path) {
-        match Document::from_file(path.to_str().unwrap_or_default()) {
-            Ok(doc) => {
-                self.document = doc;
-                self.current_file = path.to_string_lossy().to_string();
-                self.last_saved = self.document.lines.clone();
-                self.cursor.x = 0;
-                self.cursor.y = 0;
-                self.scroll_y = 0;
-            }
-            Err(_) => self.show_status("failed to open file".to_string()),
-        }
-    }
-
-    pub fn push_file_to_tabs(&mut self, path: &Path) {
-        if let Some(existing) = self.tabs_list.iter().find(|t| t.path == path) {
-            let p = existing.path.clone();
-            self.switch_to_file(&p);
-            return;
-        }
-
-        let name = path.file_name()
-        .map(|n| n.to_string_lossy().to_string())
-        .unwrap_or_default();
-
-        self.tabs_list.push(TabItem { name, path: path.to_path_buf() });
-        self.switch_to_file(path);
-    }
-
-    pub fn remove_file_from_tabs(&mut self, file: &str) {
-        if let Some(idx) = self.tabs_list.iter().position(|t| t.name == file) {
-            self.tabs_list.remove(idx);
-        }
-    }
-
-    pub fn read_dir_sorted(path: &PathBuf, depth: usize) -> Vec<FileEntry> {
-        let mut entries: Vec<FileEntry> = match std::fs::read_dir(path) {
-            Ok(read) => read
-                .filter_map(|e| e.ok())
-                .map(|e| {
-                    let path = e.path();
-                    let name = e.file_name().to_string_lossy().to_string();
-                    let is_dir = path.is_dir();
-                    FileEntry { name, path, is_dir, depth, expanded: false}
-                }).collect(),
-            Err(_) => Vec::new(),
-        };
-        entries.sort_by(|a, b| match (a.is_dir, b.is_dir) {
-            (true, false) => std::cmp::Ordering::Less,
-            (false, true) => std::cmp::Ordering::Greater,
-            _=>a.name.to_lowercase().cmp(&b.name.to_lowercase()),        
-        });
-
-        entries
-    }
-
-    pub fn refresh_explorer(&mut self) {
-        self.explorer_entries = Self::read_dir_sorted(&self.explorer_cwd, 0);
-        self.explorer_selected = 0;
-    }
-    
-
     pub fn new(file: Option<String>) -> io::Result<Self> {
         let mut app = Self::default();
         if let Some(filename) = file {
-            // app.current_file = filename.clone();
-            // app.document = Document::from_file(&filename)?;
-            // app.last_saved = app.document.lines.clone();
             app.push_file_to_tabs(Path::new(&filename));
         }
         Ok(app)
     }
-    
+
     pub fn run(&mut self, terminal: &mut DefaultTerminal,) -> io::Result<()> {
-        
         while !self.exit {
-            
             terminal.draw(|frame| {
                 self.draw(frame);
             })?;
@@ -223,10 +170,6 @@ impl App {
         Ok(())
     }
 
-    pub fn editor_x_offset(&self) -> u16 {
-        if self.show_explorer { EXPLORER_WIDTH } else { 0 }
-    }
-    
     fn draw(&mut self, frame: &mut Frame) {
         ui::draw(frame, self);
         let area = frame.area();
@@ -249,7 +192,7 @@ impl App {
             ));
         }
     }
-    
+
     fn handle_events(
         &mut self
     ) -> io::Result<()> {
@@ -276,35 +219,6 @@ impl App {
         }
 
         Ok(())
-    }
-    
-    pub fn is_dirty(&self) -> bool {
-        self.document.lines != self.last_saved
-    }
-
-    pub fn close_current_tab(&mut self) {
-        let idx = match self.tabs_list.iter().position(|t| t.path.to_string_lossy() == self.current_file) {
-            Some(i) => i,
-            None => return, // current_file isn't even an open tab, nothing to do
-        };
-
-        self.tabs_list.remove(idx);
-
-        if self.tabs_list.is_empty() {
-            self.document = Document::default();
-            self.current_file = String::new();
-            self.last_saved = self.document.lines.clone();
-            self.cursor.x = 0;
-            self.cursor.y = 0;
-            self.scroll_y = 0;
-            return;
-        }
-
-        // if we removed the last tab in the list, step back one; otherwise
-        // the tab that shifted into idx is the "next" one
-        let next_idx = idx.min(self.tabs_list.len() - 1);
-        let next_path = self.tabs_list[next_idx].path.clone();
-        self.switch_to_file(&next_path);
     }
 
     fn handle_key(&mut self, key: crossterm::event::KeyEvent) {
@@ -459,61 +373,32 @@ impl App {
         self.update_scroll(self.viewport_height.get());
     }
 
-    fn handle_explorer_click(&mut self, mouse: MouseEvent) {
-        let area = self.explorer_area.get();
-        let inside = mouse.column >= area.x
-            && mouse.column < area.x + area.width
-            && mouse.row >= area.y
-            && mouse.row < area.y + area.height;
-        if !inside { return; }
-
-        let clicked_row = (mouse.row - area.y) as usize;
-        if clicked_row < self.explorer_entries.len() {
-            self.explorer_selected = clicked_row;
-            self.open_selected_entry();
-        }
-    }
-
-    fn handle_tabs_click(&mut self, mouse: MouseEvent) {
-        let area = self.tabs_area.get();
-        let inside = mouse.column >= area.x
-            && mouse.column < area.x + area.width
-            && mouse.row >= area.y
-            && mouse.row < area.y + area.height;
-        if !inside { return; }
-
-        let mut x = area.x;
-        for tab in self.tabs_list.clone().iter() {
-            let tab_width = tab.name.len() as u16 + 4; // " {name} x "
-            if mouse.column >= x && mouse.column < x + tab_width {
-                let close_glyph_x = x + tab_width - 2;
-                if mouse.column == close_glyph_x {
-                    self.close_tab(&tab.path);
-                } else {
-                    self.switch_to_file(&tab.path);
-                }
-                break;
-            }
-            x += tab_width;
-        }
-    }
-
-    fn point_in_rect(col: u16, row: u16, area: Rect) -> bool {
-        col >= area.x && col < area.x + area.width
-            && row >= area.y && row < area.y + area.height
-    }
-
     fn handle_mouse(&mut self, mouse: MouseEvent) {
         match mouse.kind {
             MouseEventKind::Down(MouseButton::Left) => {
                 if Self::point_in_rect(mouse.column, mouse.row, self.tabs_area.get()) {
-                    self.handle_tabs_click(mouse);
+                    self.start_tab_drag(mouse);
                 } else if self.show_explorer
                     && Self::point_in_rect(mouse.column, mouse.row, self.explorer_area.get())
                 {
-                    self.handle_explorer_click(mouse);
+                    self.start_entry_drag(mouse);
                 }
             }
+            MouseEventKind::Drag(MouseButton::Left) => {
+                if self.dragging_tab.is_some() {
+                    self.update_tab_drag(mouse);
+                } else if self.dragging_entry.is_some() {
+                    self.update_entry_drag(mouse);
+                }
+            }
+            MouseEventKind::Up(MouseButton::Left) => {
+                if self.dragging_tab.is_some() {
+                    self.finish_tab_drag(mouse);
+                } else if self.dragging_entry.is_some() {
+                    self.finish_entry_drag(mouse);
+                }
+            }
+
             MouseEventKind::ScrollUp => {
                 self.cursor.y = self.cursor.y.saturating_sub(3);
                 self.update_scroll(self.viewport_height.get());
@@ -527,6 +412,294 @@ impl App {
         }
     }
 
+    fn tab_index_at(&self, column: u16, row: u16) -> Option<usize> {
+        let area = self.tabs_area.get();
+        if row != area.y { return None; }
+
+        let mut x = area.x;
+        for (i, tab) in self.tabs_list.iter().enumerate() {
+            let tab_width = tab.name.len() as u16 + 4;
+            if column >= x && column < x + tab_width {
+                return Some(i);
+            }
+            x+=tab_width;
+        }
+        None
+    }
+
+    fn start_tab_drag(&mut self, mouse: MouseEvent) {
+        if let Some(index) = self.tab_index_at(mouse.column, mouse.row) {
+            self.dragging_tab = Some(index);
+            self.tab_drag_target = Some(index);
+        }
+    }
+
+    fn update_tab_drag(&mut self, mouse: MouseEvent) {
+        if let Some(index) = self.tab_index_at(mouse.column, mouse.row) {
+            self.tab_drag_target = Some(index);
+        } else if mouse.row == self.tabs_area.get().y {
+            self.tab_drag_target = Some(self.tabs_list.len().saturating_sub(1));
+        }
+    }
+
+    fn finish_tab_drag(&mut self, mouse: MouseEvent) {
+        let start_index = self.dragging_tab.take().unwrap();
+        let target_index = self.tab_drag_target.take();
+
+        match target_index {
+            Some(t) if t != start_index && t < self.tabs_list.len() => {
+                let tab = self.tabs_list.remove(start_index);
+                self.tabs_list.insert(t, tab);
+            }
+            _=> self.click_tab(start_index, mouse.column),
+        }
+    }
+
+    fn click_tab(&mut self, index: usize, column: u16) {
+        let tab = match self.tabs_list.get(index).cloned() {
+            Some(t) => t,
+            None => return
+        };
+
+        let area = self.tabs_area.get();
+        let x_start = area.x
+            + self.tabs_list[..index]
+                .iter()
+                .map(|t| t.name.len() as u16 + 4)
+                .sum::<u16>();
+        let tab_width = tab.name.len() as u16 + 4;
+        let close_glyph_x = x_start + tab_width - 2;
+
+        if column == close_glyph_x {
+            self.close_tab(&tab.path);
+        } else {
+            self.switch_to_file(tab);
+        }
+    }
+
+    fn start_entry_drag(&mut self, mouse: MouseEvent) {
+        let area = self.explorer_area.get();
+        if mouse.row < area.y { return; }
+
+        let row = (mouse.row - area.y) as usize;
+        if row < self.explorer_entries.len() {
+            self.explorer_selected = row;
+            self.dragging_entry = Some(row);
+            self.entry_drag_target = Some(row);
+        }
+    }
+
+    fn update_entry_drag(&mut self, mouse: MouseEvent) {
+        let area = self.explorer_area.get();
+        if mouse.row < area.y { return; }
+
+        let row = (mouse.row - area.y) as usize;
+        if row < self.explorer_entries.len() {
+            self.entry_drag_target = Some(row);
+        }
+    }
+
+    fn finish_entry_drag(&mut self, mouse: MouseEvent) {
+        let source_index = self.dragging_entry.take().unwrap();
+        let target_index = self.entry_drag_target.take();
+        let _ = mouse;
+
+        match target_index {
+            Some(t) if t != source_index => self.move_entry(source_index, t),
+            _ => {
+                self.explorer_selected = source_index;
+                self.open_selected_entry();
+            }
+        }
+    }
+
+    fn move_entry(&mut self, source_index: usize, target_index:usize) {
+        let source = match self.explorer_entries.get(source_index).cloned() {
+            Some(e) => e,
+            None => return,
+        };
+
+        let target_dir = match self.explorer_entries.get(target_index) {
+            Some(e) if e.is_dir => e.path.clone(),
+            Some(e) => match e.path.parent() {
+                Some(p) => p.to_path_buf(),
+                None => return,
+            }
+            None => return,
+        };
+
+        if source.is_dir && target_dir.starts_with(&source.path) {
+            self.show_status("cannot move a folder into itself".to_string());
+        }
+
+        let file_name = match source.path.file_name() {
+            Some(n) => n,
+            None => return,
+        };
+
+        let dest = target_dir.join(file_name);
+
+        if dest == source.path { return; }
+
+        match std::fs::rename(&source.path, &dest) {
+            Ok(()) => {
+                if self.current_file == source.path.to_string_lossy() {
+                    self.current_file = dest.to_string_lossy().to_string();
+                }
+                for tab in self.tabs_list.iter_mut() {
+                    if tab.path == source.path {
+                        tab.path = dest.clone();
+                    }
+                }
+                self.refresh_explorer();
+                self.show_status(format!("move to {}", dest.display()));
+            }
+            Err(_)=>self.show_status("failed to move file".to_string()),
+        }
+    }
+
+    // fn handle_explorer_click(&mut self, mouse: MouseEvent) {
+    //     let area = self.explorer_area.get();
+    //     let inside = mouse.column >= area.x
+    //         && mouse.column < area.x + area.width
+    //         && mouse.row >= area.y
+    //         && mouse.row < area.y + area.height;
+    //     if !inside { return; }
+
+    //     let clicked_row = (mouse.row - area.y) as usize;
+    //     if clicked_row < self.explorer_entries.len() {
+    //         self.explorer_selected = clicked_row;
+    //         self.open_selected_entry();
+    //     }
+    // }
+
+    // fn handle_tabs_click(&mut self, mouse: MouseEvent) {
+    //     let area = self.tabs_area.get();
+    //     let inside = mouse.column >= area.x
+    //         && mouse.column < area.x + area.width
+    //         && mouse.row >= area.y
+    //         && mouse.row < area.y + area.height;
+    //     if !inside { return; }
+
+    //     let mut x = area.x;
+    //     for i in 0..self.tabs_list.len() {
+    //         let tab = &self.tabs_list[i];
+    //         let tab_width = tab.name.len() as u16 + 4; // " {name} x "
+    //         if mouse.column >= x && mouse.column < x + tab_width {
+    //             let close_glyph_x = x + tab_width - 2;
+    //             let tab_path = tab.path.clone();
+
+    //             let tab_snapshot = TabItem { 
+    //                 name: tab.name.clone(), 
+    //                 path: tab.path.clone(), 
+    //                 cursor: tab.cursor.clone(), 
+    //                 scroll_y: tab.scroll_y.clone()
+    //             };
+
+    //             if mouse.column == close_glyph_x {
+    //                 self.close_tab(&tab_path);
+    //             } else {
+    //                 self.switch_to_file(tab_snapshot);
+    //             }
+    //             break;
+    //         }
+    //         x += tab_width;
+    //     }
+    // }
+
+    fn point_in_rect(col: u16, row: u16, area: Rect) -> bool {
+        col >= area.x && col < area.x + area.width
+            && row >= area.y && row < area.y + area.height
+    }
+
+    pub fn editor_x_offset(&self) -> u16 {
+        if self.show_explorer { EXPLORER_WIDTH } else { 0 }
+    }
+
+    pub fn is_dirty(&self) -> bool {
+        self.document.lines != self.last_saved
+    }
+
+    fn switch_to_file(&mut self, tab: TabItem) {
+        self.save_current_tab_state();
+        
+        match Document::from_file(tab.path.to_str().unwrap_or_default()) {
+            Ok(doc) => {
+                self.document = doc;
+                self.current_file = tab.path.to_string_lossy().to_string();
+                self.last_saved = self.document.lines.clone();
+                self.cursor.x = tab.cursor.x;
+                self.cursor.y = tab.cursor.y;
+                self.scroll_y = tab.scroll_y;
+            }
+            Err(_) => self.show_status("failed to open file".to_string()),
+        }
+    }
+
+    fn save_current_tab_state(&mut self) {
+        if let Some(tab) = self
+            .tabs_list
+            .iter_mut()
+            .find(|t| t.path.to_string_lossy() == self.current_file)
+        {
+            tab.cursor.x = self.cursor.x;
+            tab.cursor.y = self.cursor.y;
+            tab.scroll_y = self.scroll_y;
+        }
+    }
+
+    pub fn push_file_to_tabs(&mut self, path: &Path) {
+        if let Some(existing) = self.tabs_list.iter().find(|t| t.path == path) {
+            let tab_snapshot = existing.clone();
+            self.switch_to_file(tab_snapshot);
+            return;
+        }
+
+        let name = path.file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
+
+        let tab = TabItem { 
+            name, path: path.to_path_buf(), 
+            cursor: Cursor { x: self.cursor.x, y: self.cursor.y },
+            scroll_y: self.scroll_y.clone()
+        };
+
+        let tab_snapshot = tab.clone();
+        self.tabs_list.push(tab);
+        self.switch_to_file(tab_snapshot);
+    }
+
+    pub fn remove_file_from_tabs(&mut self, file: &str) {
+        if let Some(idx) = self.tabs_list.iter().position(|t| t.name == file) {
+            self.tabs_list.remove(idx);
+        }
+    }
+
+    pub fn close_current_tab(&mut self) {
+        let idx = match self.tabs_list.iter().position(|t| t.path.to_string_lossy() == self.current_file) {
+            Some(i) => i,
+            None => return, // current_file isn't even an open tab, nothing to do
+        };
+
+        self.tabs_list.remove(idx);
+
+        if self.tabs_list.is_empty() {
+            self.document = Document::default();
+            self.current_file = String::new();
+            self.last_saved = self.document.lines.clone();
+            self.cursor.x = 0;
+            self.cursor.y = 0;
+            self.scroll_y = 0;
+            return;
+        }
+
+        // if we removed the last tab in the list, step back one; otherwise
+        // the tab that shifted into idx is the "next" one
+        let next_idx = idx.min(self.tabs_list.len() - 1);
+        // let next_path = self.tabs_list[next_idx].path.clone();
+        self.switch_to_file(self.tabs_list[next_idx].clone());
+    }
 
     pub fn close_tab(&mut self, path: &Path) {
         let idx = match self.tabs_list.iter().position(|t| &t.path == path) {
@@ -552,9 +725,36 @@ impl App {
         }
 
         let next_idx = idx.min(self.tabs_list.len() - 1);
-        let next_path = self.tabs_list[next_idx].path.clone();
-        self.switch_to_file(&next_path);
+        // let next_path = self.tabs_list[next_idx].path.clone();
+        self.switch_to_file(self.tabs_list[next_idx].clone());
     }
+
+    pub fn read_dir_sorted(path: &PathBuf, depth: usize) -> Vec<FileEntry> {
+        let mut entries: Vec<FileEntry> = match std::fs::read_dir(path) {
+            Ok(read) => read
+                .filter_map(|e| e.ok())
+                .map(|e| {
+                    let path = e.path();
+                    let name = e.file_name().to_string_lossy().to_string();
+                    let is_dir = path.is_dir();
+                    FileEntry { name, path, is_dir, depth, expanded: false}
+                }).collect(),
+            Err(_) => Vec::new(),
+        };
+        entries.sort_by(|a, b| match (a.is_dir, b.is_dir) {
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            _=>a.name.to_lowercase().cmp(&b.name.to_lowercase()),        
+        });
+
+        entries
+    }
+
+    pub fn refresh_explorer(&mut self) {
+        self.explorer_entries = Self::read_dir_sorted(&self.explorer_cwd, 0);
+        self.explorer_selected = 0;
+    }
+
     fn open_selected_entry(&mut self) {
         let entry = match self
             .explorer_entries
@@ -604,24 +804,34 @@ impl App {
         self.explorer_selected = self.explorer_selected.min(self.explorer_entries.len().saturating_sub(1));
     }
 
-    pub fn update_scroll(&mut self, viewport_height: usize) {
-        if self.cursor.y < self.scroll_y {
-            self.scroll_y = self.cursor.y;
+    pub fn icon_for(path: &Path, is_dir: bool) -> &str {
+        if is_dir {
+            return "󰉋";
         }
 
-        if self.cursor.y >= self.scroll_y + viewport_height {
-            self.scroll_y = self.cursor.y - viewport_height + 1;
+        match path.extension().and_then(|e| e.to_str()) {
+            Some("rs") => "󱘗",
+            Some("toml") => "",
+            Some("json") => "",
+            Some("md") => "󰍔",
+            Some("txt") => "󰈙",
+            Some("png") | Some("jpg") | Some("jpeg") => "󰈟",
+            Some("svg") => "󰜡",
+            Some("lock") => "󰌾",
+            Some("gitignore") => "",
+            _ => "󰈔",
         }
     }
 
-    pub fn show_status(&mut self, text: String) {
-        self.status = true;
-        self.status_text = text;
-    }
-
-    pub fn reset_status(&mut self) {
-        self.status = false;
-        self.status_text = String::new();
+    pub fn toggle_explorer(&mut self) {
+        if self.show_explorer == false {
+            self.show_explorer = true;
+            self.refresh_explorer();
+            self.show_status("Opened Explorer".to_string());
+        } else {
+            self.show_explorer = false;
+            self.show_status("Closed Explorer".to_string());
+        }
     }
 
     fn snapshot(&self) -> UndoState {
@@ -659,15 +869,23 @@ impl App {
         }
     }
 
-    pub fn toggle_explorer(&mut self) {
-        if self.show_explorer == false {
-            self.show_explorer = true;
-            self.refresh_explorer();
-            self.show_status("Opened Explorer".to_string());
-        } else {
-            self.show_explorer = false;
-            self.show_status("Closed Explorer".to_string());
+    pub fn update_scroll(&mut self, viewport_height: usize) {
+        if self.cursor.y < self.scroll_y {
+            self.scroll_y = self.cursor.y;
+        }
+
+        if self.cursor.y >= self.scroll_y + viewport_height {
+            self.scroll_y = self.cursor.y - viewport_height + 1;
         }
     }
 
+    pub fn show_status(&mut self, text: String) {
+        self.status = true;
+        self.status_text = text;
+    }
+
+    pub fn reset_status(&mut self) {
+        self.status = false;
+        self.status_text = String::new();
+    }
 }
