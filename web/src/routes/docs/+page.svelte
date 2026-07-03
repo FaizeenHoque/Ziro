@@ -143,13 +143,15 @@
 				<p class="text-[14px] text-[#5B5C52] mb-4">
 					The explorer opens as a sidebar and keeps folder state inline instead of jumping between
 					directories. Click a folder to expand or collapse it. Click a file to load it in the editor.
+					Drag entries to move them within the tree.
 				</p>
 				<DocsTable
 					headers={['Key', 'Action']}
 					rows={[
 						['`Ctrl+E`', 'Toggle the file explorer sidebar.'],
 						['`Click folder`', 'Expand or collapse that folder in place.'],
-						['`Click file`', 'Open the file in the editor.']
+						['`Click file`', 'Open the file in the editor.'],
+						['`Drag entry`', 'Move a file or folder into another directory.']
 					]}
 				/>
 				<Callout type="note">
@@ -162,7 +164,8 @@
 				<h2 class="font-mono text-[20px] tracking-tight mb-1">Tabs & Saving</h2>
 				<p class="text-[14px] text-[#5B5C52] mb-4">
 					Ziro keeps open files in a tab bar above the editor. Opening a file adds it to the bar,
-					clicking a tab switches to it, and closing the last tab returns you to a blank buffer.
+					clicking a tab switches to it, dragging a tab reorders the bar, and closing the last tab
+					returns you to a blank buffer. Each tab keeps its own cursor and scroll position.
 				</p>
 				<DocsTable
 					headers={['Feature', 'Behavior']}
@@ -170,6 +173,7 @@
 						['`Tab bar`', 'Shows every open file, with the current file highlighted.'],
 						['`Click tab`', 'Switch to that file immediately.'],
 						['`Click x`', 'Close that file tab.'],
+						['`Drag tab`', 'Reorder the open tabs by dragging.'],
 						['`Unnamed save`', 'Pressing `Ctrl+S` on a blank buffer opens the filename popup.'],
 						['`Enter`', 'Confirms the filename and saves the file.'],
 						['`Esc`', 'Cancels the filename popup without saving.']
@@ -193,8 +197,8 @@
 						['`Ctrl+S`', 'Save. Opens the filename popup if the buffer has no path yet.'],
 						['`Ctrl+W`', 'Close the current tab.'],
 						['`Ctrl+Alt+W`', 'Exit the editor immediately if the buffer is clean.'],
-						['`Ctrl+U`', 'Undo the last change.'],
-						['`Ctrl+R`', 'Redo the last undone change.'],
+						['`Ctrl+Z`', 'Undo the last change.'],
+						['`Ctrl+Shift+Z`', 'Redo the last undone change.'],
 						['`↑ ↓ ← →`', 'Move the cursor.'],
 						['`Enter`', 'Insert a newline, splitting the current line.'],
 						['`Backspace`', 'Delete the character before the cursor.'],

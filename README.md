@@ -64,10 +64,21 @@ curl -sSL https://ziro.faizeenhoque.dev/install-rolling.sh | bash
 ## editor features
 
 * **File explorer sidebar.** Browse folders in place and open files without leaving the editor.
-* **Tabbed files.** Open files stay in a tab bar for quick switching and closing.
+* **Tabbed files.** Open files stay in a tab bar for quick switching and closing, and tabs can be reordered by dragging.
+* **Drag-and-drop file moves.** Drag files or folders in the explorer to move them in place.
 * **Filename prompt.** Saving an unnamed buffer opens a prompt so you can choose a path.
 * **Undo / redo.** Consecutive edits are grouped into practical undo steps.
 * **Status feedback.** Saves, cancels, and invalid actions surface in the status bar.
+
+## keybindings
+
+* **Ctrl+E** toggles the file explorer.
+* **Ctrl+S** saves the current file or opens the filename prompt for a new buffer.
+* **Ctrl+W** closes the current tab.
+* **Ctrl+Alt+W** exits immediately when the buffer is clean.
+* **Ctrl+Z** undoes the last change.
+* **Ctrl+Shift+Z** redoes the last undone change.
+* **Esc** cancels the filename prompt without saving.
 
 ---
 
