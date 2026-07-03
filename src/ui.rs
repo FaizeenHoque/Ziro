@@ -213,7 +213,10 @@ fn render_explorer(app: &App, area: Rect, buf: &mut Buffer) {
 
     let lines: Vec<Line> = app.explorer_entries.iter().enumerate().map(|(i, entry)| {
         let selected = i == app.explorer_selected;
-        let style = if selected {
+        let is_drag_target = app.dragging_entry.is_some() && app.entry_drag_target == Some(i);
+        let style = if is_drag_target {
+            Style::new().bg(SELECTED_BG).fg(FG_ACCENT)
+        } else if selected {
             Style::new().bg(SELECTED_BG).fg(Color::White)
         } else if entry.is_dir {
             Style::new().bg(BG_SIDEBAR).fg(FG_DIR)
@@ -246,9 +249,12 @@ fn render_tabs(app: &App, area: Rect, buf: &mut Buffer) {
     app.tabs_area.set(area);
 
     let mut x = area.x;
-    for tab in &app.tabs_list {
+    for (i, tab) in app.tabs_list.iter().enumerate() {
         let active = tab.path.to_string_lossy() == app.current_file;
-        let style = if active {
+        let is_drag_target = app.dragging_tab.is_some() && app.tab_drag_target == Some(i);
+        let style = if is_drag_target {
+            Style::new().bg(SELECTED_BG).fg(FG_ACCENT)
+        } else if active {
             Style::new().bg(BG_TAB_ACTIVE).fg(Color::White)
         } else {
             Style::new().bg(BG_TAB_INACTIVE).fg(FG_MUTED)
