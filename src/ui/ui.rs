@@ -7,68 +7,7 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Paragraph, Widget},
 };
 
-use crate::app::{App, EXPLORER_WIDTH};
-
-// ---- VS Code Dark+ palette -------------------------------------------------
-// const BG_EDITOR: Color = Color::Rgb(30, 30, 30); // #1e1e1e
-// const BG_SIDEBAR: Color = Color::Rgb(37, 37, 38); // #252526
-// const BG_TITLEBAR: Color = Color::Rgb(51, 51, 51); // #333333
-// const BG_TABBAR: Color = Color::Rgb(37, 37, 38); // #252526
-// const BG_TAB_ACTIVE: Color = Color::Rgb(30, 30, 30); // #1e1e1e (merges into editor)
-// const BG_TAB_INACTIVE: Color = Color::Rgb(45, 45, 45); // #2d2d2d
-// const BG_STATUSBAR: Color = Color::Rgb(0, 122, 204); // #007acc
-// const BG_POPUP: Color = Color::Rgb(37, 37, 38); // #252526
-
-// const FG_DEFAULT: Color = Color::Rgb(212, 212, 212); // #d4d4d4
-// const FG_MUTED: Color = Color::Rgb(153, 153, 153); // #999999
-// const FG_STATUSBAR: Color = Color::White;
-// const FG_LINE_NUMBER: Color = Color::Rgb(133, 133, 133); // #858585
-// const FG_LINE_NUMBER_ACTIVE: Color = Color::White;
-// const FG_DIR: Color = Color::Rgb(197, 148, 106); // #c5946a (folder tan, vscode-ish)
-// const FG_ACCENT: Color = Color::Rgb(86, 156, 214); // #569cd6
-
-// const SELECTED_BG: Color = Color::Rgb(38, 79, 120); // #264f78 (list.activeSelectionBackground)
-
-
-// ---- Zed "One Dark" palette ------------------------------------------------
-// const BG_EDITOR: Color = Color::Rgb(40, 44, 52);      // #282c34
-// const BG_SIDEBAR: Color = Color::Rgb(33, 37, 43);     // #21252b
-// const BG_TITLEBAR: Color = Color::Rgb(33, 37, 43);    // #21252b
-// const BG_TABBAR: Color = Color::Rgb(33, 37, 43);      // #21252b
-// const BG_TAB_ACTIVE: Color = Color::Rgb(40, 44, 52);  // #282c34 (merges into editor)
-// const BG_TAB_INACTIVE: Color = Color::Rgb(33, 37, 43);// #21252b
-// const BG_STATUSBAR: Color = Color::Rgb(33, 37, 43);   // #21252b (Zed keeps this quiet, not a loud accent bar)
-// const BG_POPUP: Color = Color::Rgb(33, 37, 43);       // #21252b
-
-// const FG_DEFAULT: Color = Color::Rgb(171, 178, 191);  // #abb2bf
-// const FG_MUTED: Color = Color::Rgb(92, 99, 112);       // #5c6370
-// const FG_STATUSBAR: Color = Color::Rgb(171, 178, 191); // #abb2bf
-// const FG_LINE_NUMBER: Color = Color::Rgb(73, 81, 98);  // #495162
-// const FG_LINE_NUMBER_ACTIVE: Color = Color::Rgb(171, 178, 191); // #abb2bf
-// const FG_DIR: Color = Color::Rgb(229, 192, 123);       // #e5c07b (Zed's folder/keyword gold)
-// const FG_ACCENT: Color = Color::Rgb(97, 175, 239);     // #61afef (Zed blue)
-
-// const SELECTED_BG: Color = Color::Rgb(62, 68, 81);     // #3e4451
-
-// ---- Matte Black palette ---------------------------------------------------
-const BG_EDITOR: Color = Color::Rgb(18, 18, 18);       // #121212
-const BG_SIDEBAR: Color = Color::Rgb(22, 22, 22);      // #161616
-const BG_TITLEBAR: Color = Color::Rgb(26, 26, 26);     // #1a1a1a
-const BG_TABBAR: Color = Color::Rgb(22, 22, 22);       // #161616
-const BG_TAB_ACTIVE: Color = Color::Rgb(18, 18, 18);   // #121212 (merges into editor)
-const BG_TAB_INACTIVE: Color = Color::Rgb(30, 30, 30); // #1e1e1e
-const BG_STATUSBAR: Color = Color::Rgb(26, 26, 26);    // #1a1a1a (flat, no color pop)
-const BG_POPUP: Color = Color::Rgb(22, 22, 22);        // #161616
-
-const FG_DEFAULT: Color = Color::Rgb(224, 224, 224);   // #e0e0e0
-const FG_MUTED: Color = Color::Rgb(110, 110, 110);     // #6e6e6e
-const FG_STATUSBAR: Color = Color::Rgb(224, 224, 224); // #e0e0e0
-const FG_LINE_NUMBER: Color = Color::Rgb(74, 74, 74);  // #4a4a4a
-const FG_LINE_NUMBER_ACTIVE: Color = Color::Rgb(208, 208, 208); // #d0d0d0
-const FG_DIR: Color = Color::Rgb(201, 168, 118);       // #c9a876 (muted brass, only touch of color)
-const FG_ACCENT: Color = Color::Rgb(160, 160, 160);    // #a0a0a0 (grayscale accent, no blue)
-
-const SELECTED_BG: Color = Color::Rgb(42, 42, 42);     // #2a2a2a
+use crate::{app::{App, EXPLORER_WIDTH}, ui::*};
 
 pub fn draw(frame: &mut Frame, app: &mut App) {
     frame.render_widget(app, frame.area());
@@ -78,7 +17,7 @@ impl Widget for &mut App {
     fn render(self, area: ratatui::layout::Rect, buf: &mut Buffer) {
 
         Block::new()
-            .style(Style::new().bg(BG_EDITOR).fg(FG_DEFAULT))
+            .style(Style::new().bg(self.theme.bg_editor).fg(self.theme.fg_default))
             .render(area, buf);
 
         // Top bar / editor / status bar split
@@ -133,11 +72,11 @@ impl Widget for &mut App {
             .map(|(i, _line)| {
                 let line_no = self.scroll_y + i;
                 let is_current = line_no == self.cursor.y;
-                let fg = if is_current { FG_LINE_NUMBER_ACTIVE } else { FG_LINE_NUMBER };
+                let fg = if is_current { self.theme.fg_line_number_active } else { self.theme.fg_line_number };
                 Line::from(vec![
                     Span::styled(
                         format!("{:>4} ", line_no + 1),
-                        Style::new().fg(fg).bg(BG_EDITOR),
+                        Style::new().fg(fg).bg(self.theme.bg_editor),
                     ),
                 ])
             })
@@ -151,22 +90,22 @@ impl Widget for &mut App {
             .collect();
 
         // TOP BAR
-        Block::default().style(Style::new().bg(BG_TITLEBAR)).render(top_bar_area, buf);
+        Block::default().style(Style::new().bg(self.theme.bg_titlebar)).render(top_bar_area, buf);
         let top_bar = Paragraph::new(format!("Ziro @ {} ", self.current_file))
-            .style(Style::new().bg(BG_TITLEBAR).fg(FG_MUTED));
+            .style(Style::new().bg(self.theme.bg_titlebar).fg(self.theme.fg_muted));
         top_bar.render(top_bar_area, buf);
 
         // STATUS BAR
-        Block::default().style(Style::new().bg(BG_STATUSBAR)).render(status_area, buf);
+        Block::default().style(Style::new().bg(self.theme.bg_statusbar)).render(status_area, buf);
         Paragraph::new(format!(" STATUS {}", self.status_text))
-            .style(Style::new().bg(BG_STATUSBAR).fg(FG_STATUSBAR))
+            .style(Style::new().bg(self.theme.bg_statusbar).fg(self.theme.fg_statusbar))
             .render(status_area, buf);
 
         Paragraph::new(numbers)
-            .style(Style::new().bg(BG_EDITOR))
+            .style(Style::new().bg(self.theme.bg_editor))
             .render(horizontal[0], buf);
         Paragraph::new(content_lines)
-            .style(Style::new().bg(BG_EDITOR).fg(FG_DEFAULT))
+            .style(Style::new().bg(self.theme.bg_editor).fg(self.theme.fg_default))
             .render(horizontal[1], buf);
 
         // Filename popup
@@ -178,7 +117,7 @@ impl Widget for &mut App {
             Block::new()
                 .title(" Enter filename ")
                 .borders(Borders::ALL)
-                .style(Style::new().bg(BG_POPUP).fg(FG_DEFAULT))
+                .style(Style::new().bg(self.theme.bg_popup).fg(self.theme.fg_default))
                 .render(popup_area, buf);
 
             let inner = Rect {
@@ -189,7 +128,7 @@ impl Widget for &mut App {
             };
 
             Paragraph::new(self.filename_input.as_str())
-                .style(Style::new().bg(BG_POPUP).fg(FG_DEFAULT))
+                .style(Style::new().bg(self.theme.bg_popup).fg(self.theme.fg_default))
                 .render(inner, buf);
         }
     }
@@ -199,7 +138,7 @@ fn render_explorer(app: &App, area: Rect, buf: &mut Buffer) {
     Block::new()
         .title("Explorer")
         .borders(Borders::ALL)
-        .style(Style::new().bg(BG_SIDEBAR).fg(FG_MUTED))
+        .style(Style::new().bg(app.theme.bg_sidebar).fg(app.theme.fg_muted))
         .render(area, buf);
 
     let inner = Rect {
@@ -215,13 +154,13 @@ fn render_explorer(app: &App, area: Rect, buf: &mut Buffer) {
         let selected = i == app.explorer_selected;
         let is_drag_target = app.dragging_entry.is_some() && app.entry_drag_target == Some(i);
         let style = if is_drag_target {
-            Style::new().bg(SELECTED_BG).fg(FG_ACCENT)
+            Style::new().bg(app.theme.selected_bg).fg(app.theme.fg_accent)
         } else if selected {
-            Style::new().bg(SELECTED_BG).fg(Color::White)
+            Style::new().bg(app.theme.selected_bg).fg(Color::White)
         } else if entry.is_dir {
-            Style::new().bg(BG_SIDEBAR).fg(FG_DIR)
+            Style::new().bg(app.theme.bg_sidebar).fg(app.theme.fg_dir)
         } else {
-            Style::new().bg(BG_SIDEBAR).fg(FG_DEFAULT)
+            Style::new().bg(app.theme.bg_sidebar).fg(app.theme.fg_default)
         };
 
         let indent = "  ".repeat(entry.depth);
@@ -240,12 +179,12 @@ fn render_explorer(app: &App, area: Rect, buf: &mut Buffer) {
     }).collect();
 
     Paragraph::new(lines)
-        .style(Style::new().bg(BG_SIDEBAR))
+        .style(Style::new().bg(app.theme.bg_sidebar))
         .render(inner, buf);
 }
 
 fn render_tabs(app: &App, area: Rect, buf: &mut Buffer) {
-    Block::new().style(Style::new().bg(BG_TABBAR)).render(area, buf);
+    Block::new().style(Style::new().bg(app.theme.bg_tabbar)).render(area, buf);
     app.tabs_area.set(area);
 
     let mut x = area.x;
@@ -253,11 +192,11 @@ fn render_tabs(app: &App, area: Rect, buf: &mut Buffer) {
         let active = tab.path.to_string_lossy() == app.current_file;
         let is_drag_target = app.dragging_tab.is_some() && app.tab_drag_target == Some(i);
         let style = if is_drag_target {
-            Style::new().bg(SELECTED_BG).fg(FG_ACCENT)
+            Style::new().bg(app.theme.selected_bg).fg(app.theme.fg_accent)
         } else if active {
-            Style::new().bg(BG_TAB_ACTIVE).fg(Color::White)
+            Style::new().bg(app.theme.bg_tab_active).fg(Color::White)
         } else {
-            Style::new().bg(BG_TAB_INACTIVE).fg(FG_MUTED)
+            Style::new().bg(app.theme.bg_tab_inactive).fg(app.theme.fg_muted)
         };
         let label = format!(" {} x ", tab.name);
         let width = label.len() as u16;
@@ -269,7 +208,7 @@ fn render_tabs(app: &App, area: Rect, buf: &mut Buffer) {
         if active {
             for cx in x..x + width {
                 if let Some(cell) = buf.cell_mut((cx, area.y)) {
-                    cell.set_style(Style::new().bg(BG_TAB_ACTIVE).fg(FG_ACCENT));
+                    cell.set_style(Style::new().bg(app.theme.bg_tab_active).fg(app.theme.fg_accent));
                 }
             }
         }
@@ -278,7 +217,7 @@ fn render_tabs(app: &App, area: Rect, buf: &mut Buffer) {
 
     if x < area.x + area.width {
         Paragraph::new("")
-            .style(Style::new().bg(BG_TABBAR))
+            .style(Style::new().bg(app.theme.bg_tabbar))
             .render(Rect { x, y: area.y, width: area.x + area.width - x, height: 1 }, buf);
     }
 }

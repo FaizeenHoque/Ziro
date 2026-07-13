@@ -1,9 +1,8 @@
 // main.rs
 mod app;
-mod cursor;
-mod document;
+mod management;
 mod ui;
-mod syntax;
+mod editor;
 
 use std::io;
 use std::env;
