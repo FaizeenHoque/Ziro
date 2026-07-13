@@ -86,10 +86,6 @@
 					Tested on Arch Linux — other distros may work but are untested.
 				</p>
 
-				<Callout type="warning">
-					macOS and Windows are not supported. There are no plans to change this.
-				</Callout>
-
 				<h3 class="font-mono text-[15px] mt-8 mb-1">Stable</h3>
 				<p class="text-[14px] text-[#5B5C52]">Downloads a prebuilt binary. No Rust required.</p>
 				<CodeBlock
