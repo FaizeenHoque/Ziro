@@ -16,6 +16,7 @@ impl App {
         // (Diagnostics, Hover, Definition, Initialized, Json) are not yet
         // wired to any UI state. Add arms here as those features land.
         self.poll_hover();
+        self.poll_semantic_tokens();
         while let Some(message) = self.lsp.as_ref().and_then(|lsp| lsp.try_recv()) {
             match message {
                 LspMessage::Initialized(legend) => { if let Some(lsp) = self.lsp.as_mut() { let _ = lsp.initialized(); } self.semantic_legend = legend; self.lsp_ready = true; self.open_current_document(); }

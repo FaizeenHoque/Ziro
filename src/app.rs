@@ -24,6 +24,7 @@ pub struct App {
     pub lsp: Option<LspClient>,
     pub lsp_ready: bool,
     pub semantic_legend: Vec<String>, pub semantic_tokens: BTreeMap<usize, Vec<SemanticToken>>,
+    pub semantic_refresh: Option<Instant>,
     pub diagnostics: Vec<Diagnostic>, pub completions: Vec<CompletionItem>, pub completion_selected: usize, pub hover: Option<Hover>, pub hover_position: Option<(usize, usize)>, pub hover_anchor: Option<(u16, u16)>, pub hover_pending: Option<(usize, usize, u16, u16, Instant)>,
     pub cursor: Cursor,
     pub highlighter: Highlighter,
@@ -80,7 +81,7 @@ impl Default for App {
             document,
             theme: Theme::by_name("matte"),
             lsp: LspClient::new().ok(),
-            lsp_ready: false, semantic_legend: Vec::new(), semantic_tokens: BTreeMap::new(), diagnostics: Vec::new(), completions: Vec::new(), completion_selected: 0, hover: None, hover_position: None, hover_anchor: None, hover_pending: None,
+            lsp_ready: false, semantic_legend: Vec::new(), semantic_tokens: BTreeMap::new(), semantic_refresh: None, diagnostics: Vec::new(), completions: Vec::new(), completion_selected: 0, hover: None, hover_position: None, hover_anchor: None, hover_pending: None,
 
             current_file: String::new(),
             highlighter: Highlighter::new(),
@@ -208,6 +209,13 @@ impl App {
             Ok(doc) => {
                 self.document = doc;
                 self.current_file = tab.path.to_string_lossy().to_string();
+                self.diagnostics.clear();
+                self.completions.clear();
+                self.hover = None;
+                self.hover_pending = None;
+                self.hover_position = None;
+                self.semantic_tokens.clear();
+                self.semantic_refresh = None;
                 self.last_saved = self.document.lines.clone();
                 self.cursor.x = tab.cursor.x;
                 self.cursor.y = tab.cursor.y;
@@ -241,9 +249,10 @@ impl App {
         self.status_text = String::new();
     }
 
-    pub fn document_changed(&mut self, completion: bool) { self.hover = None; self.hover_pending = None; self.hover_position = None; self.completions.clear(); self.diagnostics.clear(); let Some(path) = (!self.current_file.is_empty()).then(|| PathBuf::from(&self.current_file)) else { return; }; let text = self.document.lines.join("\n"); let character = self.document.lines[self.cursor.y][..self.cursor.x].encode_utf16().count(); if let Some(lsp) = self.lsp.as_mut() { let _ = lsp.did_change(&path, &text); if completion { let _ = lsp.completion(&path, self.cursor.y, character); } } }
+    pub fn document_changed(&mut self, completion: bool) { self.hover = None; self.hover_pending = None; self.hover_position = None; self.completions.clear(); self.diagnostics.clear(); self.semantic_tokens.clear(); self.semantic_refresh = Some(Instant::now()); let Some(path) = (!self.current_file.is_empty()).then(|| PathBuf::from(&self.current_file)) else { return; }; let text = self.document.lines.join("\n"); let character = self.document.lines[self.cursor.y][..self.cursor.x].encode_utf16().count(); if let Some(lsp) = self.lsp.as_mut() { let _ = lsp.did_change(&path, &text); if completion { let _ = lsp.completion(&path, self.cursor.y, character); } } }
     pub fn open_current_document(&mut self) { if !self.lsp_ready || self.current_file.is_empty() { return; } if let Some(lsp) = self.lsp.as_mut() { let path = Path::new(&self.current_file); let _ = lsp.did_open(path, &self.document.lines.join("\n")); let _ = lsp.semantic_tokens(path); } }
     pub fn set_semantic_tokens(&mut self, data: Vec<u32>) { self.semantic_tokens.clear(); let (mut line, mut start) = (0usize, 0usize); for chunk in data.chunks_exact(5) { line += chunk[0] as usize; start = if chunk[0] == 0 { start + chunk[1] as usize } else { chunk[1] as usize }; if let Some(token_type) = self.semantic_legend.get(chunk[3] as usize).cloned() { self.semantic_tokens.entry(line).or_default().push(SemanticToken { start, length: chunk[2] as usize, token_type, modifiers: chunk[4] }); } } }
+    pub fn poll_semantic_tokens(&mut self) { if self.semantic_refresh.is_none_or(|time| time.elapsed() < Duration::from_millis(250)) { return; } self.semantic_refresh = None; if let Some(lsp) = self.lsp.as_mut() { let _ = lsp.semantic_tokens(Path::new(&self.current_file)); } }
     pub fn request_hover_at(&mut self, column: u16, row: u16) { let area = self.editor_area.get(); let x = area.x + self.number_col_width; if row < area.y || row >= area.y + area.height || column < x { self.hover_pending = None; self.hover = None; return; } let line = self.scroll_y + (row - area.y) as usize; let Some(text) = self.document.lines.get(line) else { return; }; let offset = (column - x) as usize; let Some((index, character)) = text.char_indices().nth(offset) else { self.hover_pending = None; self.hover = None; return; }; if !character.is_alphanumeric() && character != '_' { self.hover_pending = None; self.hover = None; return; } let position = text[..index].encode_utf16().count(); self.hover = None; self.hover_pending = Some((line, position, column, row, Instant::now())); }
     pub fn poll_hover(&mut self) { let Some((line, character, x, y, since)) = self.hover_pending else { return; }; if since.elapsed() < Duration::from_millis(300) { return; } self.hover_pending = None; self.hover_position = Some((line, character)); self.hover_anchor = Some((x, y)); if let Some(lsp) = self.lsp.as_mut() { let _ = lsp.hover(Path::new(&self.current_file), line, character); } }
 }
