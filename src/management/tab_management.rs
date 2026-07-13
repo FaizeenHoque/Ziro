@@ -105,18 +105,12 @@ impl App {
         let tab = TabItem { 
             name, path: path.to_path_buf(), 
             cursor: Cursor { x: self.cursor.x, y: self.cursor.y },
-            scroll_y: self.scroll_y.clone()
+            scroll_y: self.scroll_y
         };
 
         let tab_snapshot = tab.clone();
         self.tabs_list.push(tab);
         self.switch_to_file(tab_snapshot);
-    }
-
-    pub fn remove_file_from_tabs(&mut self, file: &str) {
-        if let Some(idx) = self.tabs_list.iter().position(|t| t.name == file) {
-            self.tabs_list.remove(idx);
-        }
     }
 
     pub fn close_current_tab(&mut self) {
@@ -140,7 +134,6 @@ impl App {
         // if we removed the last tab in the list, step back one; otherwise
         // the tab that shifted into idx is the "next" one
         let next_idx = idx.min(self.tabs_list.len() - 1);
-        // let next_path = self.tabs_list[next_idx].path.clone();
         self.switch_to_file(self.tabs_list[next_idx].clone());
     }
 
@@ -168,8 +161,6 @@ impl App {
         }
 
         let next_idx = idx.min(self.tabs_list.len() - 1);
-        // let next_path = self.tabs_list[next_idx].path.clone();
         self.switch_to_file(self.tabs_list[next_idx].clone());
     }
-
 }
