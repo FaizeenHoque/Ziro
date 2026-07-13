@@ -3,7 +3,7 @@ use std::time::Duration;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, MouseButton, MouseEvent, MouseEventKind};
 
 use crate::app::{ActionKind, App};
-use crate::lsp::LspMessage;
+use crate::lsp::{LspMessage, LspStatus};
 
 impl App {
     pub fn handle_events(&mut self) -> io::Result<()> {
@@ -11,20 +11,48 @@ impl App {
             while self.poll_and_dispatch(Duration::from_millis(0))? {}
         }
 
-        // Drain all pending messages from rust-analyzer.
-        // NOTE: only LspMessage::Completion is handled right now; the rest
-        // (Diagnostics, Hover, Definition, Initialized, Json) are not yet
-        // wired to any UI state. Add arms here as those features land.
         self.poll_hover();
         self.poll_semantic_tokens();
-        while let Some(message) = self.lsp.as_ref().and_then(|lsp| lsp.try_recv()) {
-            match message {
-                LspMessage::Initialized(legend) => { if let Some(lsp) = self.lsp.as_mut() { let _ = lsp.initialized(); } self.semantic_legend = legend; self.lsp_ready = true; self.open_current_document(); }
-                LspMessage::Completion(mut items) => { let prefix = self.document.lines[self.cursor.y][..self.cursor.x].rsplit(|character: char| !character.is_alphanumeric() && character != '_').next().unwrap_or_default().to_lowercase(); if !prefix.is_empty() { items.retain(|item| item.label.to_lowercase().starts_with(&prefix)); } self.completions = items; self.completion_selected = 0; }
-                LspMessage::Diagnostics(uri, items) if uri == crate::lsp::protocol::path_to_uri(std::path::Path::new(&self.current_file)) => self.diagnostics = items,
-                LspMessage::Hover(line, character, hover) if self.hover_position == Some((line, character)) => self.hover = hover,
-                LspMessage::SemanticTokens(data) => self.set_semantic_tokens(data),
-                _ => {}
+
+        let current_language = self.language_id();
+        let languages: Vec<String> = self.lsp_sessions.keys().cloned().collect();
+
+        for language in languages {
+            let is_current = current_language == Some(language.as_str());
+            loop {
+                let message = match self.lsp_sessions.get(&language) {
+                    Some(session) => session.client.try_recv(),
+                    None => None,
+                };
+                let Some(message) = message else { break; };
+
+                match message {
+                    LspMessage::Initialized(legend) => {
+                        if let Some(session) = self.lsp_sessions.get_mut(&language) {
+                            let _ = session.client.initialized();
+                            session.semantic_legend = legend;
+                            session.status = LspStatus::Alive;
+                        }
+                        if is_current { self.open_current_document(); }
+                    }
+                    LspMessage::Completion(mut items) if is_current => {
+                        let prefix = self.document.lines[self.cursor.y][..self.cursor.x].rsplit(|character: char| !character.is_alphanumeric() && character != '_').next().unwrap_or_default().to_lowercase();
+                        if !prefix.is_empty() { items.retain(|item| item.label.to_lowercase().starts_with(&prefix)); }
+                        self.completions = items;
+                        self.completion_selected = 0;
+                    }
+                    LspMessage::Diagnostics(uri, items) if is_current && uri == crate::lsp::protocol::path_to_uri(std::path::Path::new(&self.current_file)) => {
+                        self.diagnostics = items;
+                    }
+                    LspMessage::Hover(line, character, hover) if is_current && self.hover_position == Some((line, character)) => {
+                        self.hover = hover;
+                    }
+                    LspMessage::SemanticTokens(data) if is_current => {
+                        let legend = self.lsp_sessions.get(&language).map(|s| s.semantic_legend.clone()).unwrap_or_default();
+                        self.set_semantic_tokens(&legend, data);
+                    }
+                    _ => {}
+                }
             }
         }
 

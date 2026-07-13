@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, path::Path, time::{Duration, Instant}};
+use std::{collections::{BTreeMap, HashMap}, path::Path, time::{Duration, Instant}};
 use std::{io, path::PathBuf};
 use std::cell::Cell;
 
@@ -8,7 +8,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::lsp::LspClient;
+use crate::lsp::{LspClient, LspSession, LspStatus};
 use crate::lsp::protocol::{CompletionItem, Diagnostic, Hover, SemanticToken};
 use crate::management::{TabItem, UndoState};
 use crate::ui::Theme;
@@ -21,9 +21,8 @@ use crate::{
 pub struct App {
     pub document: Document,
     pub theme: Theme,
-    pub lsp: Option<LspClient>,
-    pub lsp_ready: bool,
-    pub semantic_legend: Vec<String>, pub semantic_tokens: BTreeMap<usize, Vec<SemanticToken>>,
+    pub lsp_sessions: HashMap<String, LspSession>,
+    pub semantic_tokens: BTreeMap<usize, Vec<SemanticToken>>,
     pub semantic_refresh: Option<Instant>,
     pub diagnostics: Vec<Diagnostic>, pub completions: Vec<CompletionItem>, pub completion_selected: usize, pub hover: Option<Hover>, pub hover_position: Option<(usize, usize)>, pub hover_anchor: Option<(u16, u16)>, pub hover_pending: Option<(usize, usize, u16, u16, Instant)>,
     pub cursor: Cursor,
@@ -80,8 +79,8 @@ impl Default for App {
         Self {
             document,
             theme: Theme::by_name("matte"),
-            lsp: LspClient::new().ok(),
-            lsp_ready: false, semantic_legend: Vec::new(), semantic_tokens: BTreeMap::new(), semantic_refresh: None, diagnostics: Vec::new(), completions: Vec::new(), completion_selected: 0, hover: None, hover_position: None, hover_anchor: None, hover_pending: None,
+            lsp_sessions: HashMap::new(),
+            semantic_tokens: BTreeMap::new(), semantic_refresh: None, diagnostics: Vec::new(), completions: Vec::new(), completion_selected: 0, hover: None, hover_position: None, hover_anchor: None, hover_pending: None,
 
             current_file: String::new(),
             highlighter: Highlighter::new(),
@@ -129,10 +128,6 @@ pub const EXPLORER_WIDTH: u16 = 40;
 impl App {
     pub fn new(file: Option<String>) -> io::Result<Self> {
         let mut app = Self::default();
-        let root = file.as_deref().and_then(|file| Path::new(file).canonicalize().ok()).and_then(|file| file.parent().map(Path::to_path_buf)).unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))).ancestors().find(|path| path.join("Cargo.toml").is_file()).map(Path::to_path_buf).unwrap_or_else(|| PathBuf::from("."));
-        if let Some(lsp) = app.lsp.as_mut() {
-            lsp.initialize(&root)?;
-        }
         if let Some(filename) = file { app.push_file_to_tabs(Path::new(&filename)); }
         Ok(app)
     }
@@ -146,7 +141,14 @@ impl App {
             self.handle_events()?;
         }
 
+        self.shutdown_lsp_sessions();
         Ok(())
+    }
+
+    fn shutdown_lsp_sessions(&mut self) {
+        for session in self.lsp_sessions.values_mut() {
+            let _ = session.client.shutdown();
+        }
     }
 
     fn draw(&mut self, frame: &mut Frame) {
@@ -202,6 +204,66 @@ impl App {
         }
     }
 
+    pub fn language_id(&self) -> Option<&'static str> {
+        crate::lsp::registry::language_for_path(Path::new(&self.current_file))
+    }
+
+    pub fn current_session_mut(&mut self) -> Option<&mut LspSession> {
+        let language = self.language_id()?;
+        self.lsp_sessions.get_mut(language)
+    }
+
+    pub fn current_session(&self) -> Option<&LspSession> {
+        let language = self.language_id()?;
+        self.lsp_sessions.get(language)
+    }
+
+    /// Lazily spawns a session for the current file's language if one
+    /// doesn't exist yet. Does nothing if no server is installed —
+    /// editing stays syntect-only, never blocked.
+    pub fn ensure_lsp_session(&mut self) {
+        let Some(language) = self.language_id() else { return; };
+        if self.lsp_sessions.contains_key(language) { return; }
+
+        let Some((binary, args)) = crate::lsp::registry::find_server(language) else {
+            return;
+        };
+
+        match LspClient::spawn(&binary, args, language) {
+            Ok(mut client) => {
+                let start = Path::new(&self.current_file).parent()
+                    .map(Path::to_path_buf)
+                    .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+                let root = crate::lsp::registry::find_root(&start, language);
+                let _ = client.initialize(&root);
+                self.lsp_sessions.insert(language.to_string(), LspSession {
+                    client,
+                    status: LspStatus::Initializing,
+                    semantic_legend: Vec::new(),
+                });
+            }
+            Err(_) => {
+                // Binary was found on PATH but failed to spawn (permissions,
+                // corrupt install, etc). No session inserted — same
+                // "none found" treatment rather than a half-broken entry.
+            }
+        }
+    }
+
+    pub fn lsp_status_text(&self) -> String {
+        match self.language_id() {
+            None => "n/a".to_string(),
+            Some(language) => match self.lsp_sessions.get(language) {
+                Some(session) => format!("{language} {}", match session.status {
+                    LspStatus::Initializing => "initializing",
+                    LspStatus::Alive => "alive",
+                    LspStatus::Offline => "offline",
+                }),
+                None => format!("{language}: none found"),
+            }
+        }
+    }
+
     pub fn switch_to_file(&mut self, tab: TabItem) {
         self.save_current_tab_state();
 
@@ -220,6 +282,7 @@ impl App {
                 self.cursor.x = tab.cursor.x;
                 self.cursor.y = tab.cursor.y;
                 self.scroll_y = tab.scroll_y;
+                self.ensure_lsp_session();
                 self.open_current_document();
             }
 
@@ -249,10 +312,89 @@ impl App {
         self.status_text = String::new();
     }
 
-    pub fn document_changed(&mut self, completion: bool) { self.hover = None; self.hover_pending = None; self.hover_position = None; self.completions.clear(); self.diagnostics.clear(); self.semantic_tokens.clear(); self.semantic_refresh = Some(Instant::now()); let Some(path) = (!self.current_file.is_empty()).then(|| PathBuf::from(&self.current_file)) else { return; }; let text = self.document.lines.join("\n"); let character = self.document.lines[self.cursor.y][..self.cursor.x].encode_utf16().count(); if let Some(lsp) = self.lsp.as_mut() { let _ = lsp.did_change(&path, &text); if completion { let _ = lsp.completion(&path, self.cursor.y, character); } } }
-    pub fn open_current_document(&mut self) { if !self.lsp_ready || self.current_file.is_empty() { return; } if let Some(lsp) = self.lsp.as_mut() { let path = Path::new(&self.current_file); let _ = lsp.did_open(path, &self.document.lines.join("\n")); let _ = lsp.semantic_tokens(path); } }
-    pub fn set_semantic_tokens(&mut self, data: Vec<u32>) { self.semantic_tokens.clear(); let (mut line, mut start) = (0usize, 0usize); for chunk in data.chunks_exact(5) { line += chunk[0] as usize; start = if chunk[0] == 0 { start + chunk[1] as usize } else { chunk[1] as usize }; if let Some(token_type) = self.semantic_legend.get(chunk[3] as usize).cloned() { self.semantic_tokens.entry(line).or_default().push(SemanticToken { start, length: chunk[2] as usize, token_type, modifiers: chunk[4] }); } } }
-    pub fn poll_semantic_tokens(&mut self) { if self.semantic_refresh.is_none_or(|time| time.elapsed() < Duration::from_millis(250)) { return; } self.semantic_refresh = None; if let Some(lsp) = self.lsp.as_mut() { let _ = lsp.semantic_tokens(Path::new(&self.current_file)); } }
-    pub fn request_hover_at(&mut self, column: u16, row: u16) { let area = self.editor_area.get(); let x = area.x + self.number_col_width; if row < area.y || row >= area.y + area.height || column < x { self.hover_pending = None; self.hover = None; return; } let line = self.scroll_y + (row - area.y) as usize; let Some(text) = self.document.lines.get(line) else { return; }; let offset = (column - x) as usize; let Some((index, character)) = text.char_indices().nth(offset) else { self.hover_pending = None; self.hover = None; return; }; if !character.is_alphanumeric() && character != '_' { self.hover_pending = None; self.hover = None; return; } let position = text[..index].encode_utf16().count(); self.hover = None; self.hover_pending = Some((line, position, column, row, Instant::now())); }
-    pub fn poll_hover(&mut self) { let Some((line, character, x, y, since)) = self.hover_pending else { return; }; if since.elapsed() < Duration::from_millis(300) { return; } self.hover_pending = None; self.hover_position = Some((line, character)); self.hover_anchor = Some((x, y)); if let Some(lsp) = self.lsp.as_mut() { let _ = lsp.hover(Path::new(&self.current_file), line, character); } }
+    pub fn document_changed(&mut self, completion: bool) {
+        self.hover = None;
+        self.hover_pending = None;
+        self.hover_position = None;
+        self.completions.clear();
+        self.diagnostics.clear();
+        self.semantic_tokens.clear();
+        self.semantic_refresh = Some(Instant::now());
+
+        let Some(path) = (!self.current_file.is_empty()).then(|| PathBuf::from(&self.current_file)) else {
+            return;
+        };
+
+        let text = self.document.lines.join("\n");
+        let line = self.cursor.y;
+        let character = self.document.lines[line][..self.cursor.x]
+            .encode_utf16()
+            .count();
+
+        if let Some(session) = self.current_session_mut() {
+            let _ = session.client.did_change(&path, &text);
+
+            if completion {
+                let _ = session.client.completion(&path, line, character);
+            }
+        }
+    }
+
+    pub fn open_current_document(&mut self) {
+        if self.current_file.is_empty() { return; }
+        let is_alive = self.current_session().map(|s| s.status == LspStatus::Alive).unwrap_or(false);
+        if !is_alive { return; }
+        let path = Path::new(&self.current_file).to_path_buf();
+        let text = self.document.lines.join("\n");
+        if let Some(session) = self.current_session_mut() {
+            let _ = session.client.did_open(&path, &text);
+            let _ = session.client.semantic_tokens(&path);
+        }
+    }
+
+    pub fn set_semantic_tokens(&mut self, legend: &[String], data: Vec<u32>) {
+        self.semantic_tokens.clear();
+        let (mut line, mut start) = (0usize, 0usize);
+        for chunk in data.chunks_exact(5) {
+            line += chunk[0] as usize;
+            start = if chunk[0] == 0 { start + chunk[1] as usize } else { chunk[1] as usize };
+            if let Some(token_type) = legend.get(chunk[3] as usize).cloned() {
+                self.semantic_tokens.entry(line).or_default().push(SemanticToken { start, length: chunk[2] as usize, token_type, modifiers: chunk[4] });
+            }
+        }
+    }
+
+    pub fn poll_semantic_tokens(&mut self) {
+        if self.semantic_refresh.is_none_or(|time| time.elapsed() < Duration::from_millis(250)) { return; }
+        self.semantic_refresh = None;
+        let path = Path::new(&self.current_file).to_path_buf();
+        if let Some(session) = self.current_session_mut() {
+            let _ = session.client.semantic_tokens(&path);
+        }
+    }
+
+    pub fn request_hover_at(&mut self, column: u16, row: u16) {
+        let area = self.editor_area.get(); let x = area.x + self.number_col_width;
+        if row < area.y || row >= area.y + area.height || column < x { self.hover_pending = None; self.hover = None; return; }
+        let line = self.scroll_y + (row - area.y) as usize;
+        let Some(text) = self.document.lines.get(line) else { return; };
+        let offset = (column - x) as usize;
+        let Some((index, character)) = text.char_indices().nth(offset) else { self.hover_pending = None; self.hover = None; return; };
+        if !character.is_alphanumeric() && character != '_' { self.hover_pending = None; self.hover = None; return; }
+        let position = text[..index].encode_utf16().count();
+        self.hover = None;
+        self.hover_pending = Some((line, position, column, row, Instant::now()));
+    }
+
+    pub fn poll_hover(&mut self) {
+        let Some((line, character, x, y, since)) = self.hover_pending else { return; };
+        if since.elapsed() < Duration::from_millis(300) { return; }
+        self.hover_pending = None;
+        self.hover_position = Some((line, character));
+        self.hover_anchor = Some((x, y));
+        let path = Path::new(&self.current_file).to_path_buf();
+        if let Some(session) = self.current_session_mut() {
+            let _ = session.client.hover(&path, line, character);
+        }
+    }
 }

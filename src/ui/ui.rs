@@ -20,7 +20,6 @@ impl Widget for &mut App {
             .style(Style::new().bg(self.theme.bg_editor).fg(self.theme.fg_default))
             .render(area, buf);
 
-        // Top bar / editor / status bar split
         let outer = Layout::vertical([
             Constraint::Length(1),
             Constraint::Min(1),
@@ -89,15 +88,13 @@ impl Widget for &mut App {
             .map(|line| Line::from(line.spans))
             .collect();
 
-        // TOP BAR
         Block::default().style(Style::new().bg(self.theme.bg_titlebar)).render(top_bar_area, buf);
         let top_bar = Paragraph::new(format!("Ziro @ {} ", self.current_file))
             .style(Style::new().bg(self.theme.bg_titlebar).fg(self.theme.fg_muted));
         top_bar.render(top_bar_area, buf);
 
-        // STATUS BAR
         Block::default().style(Style::new().bg(self.theme.bg_statusbar)).render(status_area, buf);
-        Paragraph::new(format!(" {}  Ln {}, Col {}  {}  LSP: {}  {}", self.status_text, self.cursor.y + 1, self.cursor.x + 1, self.language_name(), if self.lsp_ready { "alive" } else { "offline" }, if self.is_dirty() { "modified" } else { "saved" }))
+        Paragraph::new(format!(" {}  Ln {}, Col {}  {}  LSP: {}  {}", self.status_text, self.cursor.y + 1, self.cursor.x + 1, self.language_name(), self.lsp_status_text(), if self.is_dirty() { "modified" } else { "saved" }))
             .style(Style::new().bg(self.theme.bg_statusbar).fg(self.theme.fg_statusbar))
             .render(status_area, buf);
 
@@ -109,7 +106,6 @@ impl Widget for &mut App {
             .render(horizontal[1], buf);
         render_language_overlays(self, horizontal[1], buf);
 
-        // Filename popup
         if self.filename_prompt {
             let popup_area = centered_rect(40, 5, area);
 
