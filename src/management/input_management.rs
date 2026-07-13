@@ -3,22 +3,36 @@ use std::time::Duration;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, MouseButton, MouseEvent, MouseEventKind};
 
 use crate::app::{ActionKind, App};
+use crate::lsp::LspMessage;
 
 impl App {
-    pub fn handle_events(
-        &mut self
-    ) -> io::Result<()> {
-        match event::read()? {
-            Event::Key(key) if key.kind == KeyEventKind::Press => {
-                self.handle_key(key);
-            }
-            Event::Mouse(mouse) => {
-                self.handle_mouse(mouse);
-            }
-            _=>{}
+    pub fn handle_events(&mut self) -> io::Result<()> {
+        if self.poll_and_dispatch(Duration::from_millis(16))? {
+            while self.poll_and_dispatch(Duration::from_millis(0))? {}
         }
 
-        while event::poll(Duration::from_millis(0))? {
+        // Drain all pending messages from rust-analyzer.
+        // NOTE: only LspMessage::Completion is handled right now; the rest
+        // (Diagnostics, Hover, Definition, Initialized, Json) are not yet
+        // wired to any UI state. Add arms here as those features land.
+        if let Some(lsp) = self.lsp.as_mut() {
+            while let Some(msg) = lsp.try_recv() {
+                if let LspMessage::Completion(items) = msg {
+                    crate::debug::log(format!("{} completion items", items.len()));
+                    for item in items {
+                        crate::debug::log(format!("  {}", item.label));
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Polls for a single terminal event within `timeout` and dispatches it.
+    /// Returns Ok(true) if an event was found and handled.
+    fn poll_and_dispatch(&mut self, timeout: Duration) -> io::Result<bool> {
+        if event::poll(timeout)? {
             match event::read()? {
                 Event::Key(key) if key.kind == KeyEventKind::Press => {
                     self.handle_key(key);
@@ -26,11 +40,11 @@ impl App {
                 Event::Mouse(mouse) => {
                     self.handle_mouse(mouse);
                 }
-                _=>{}
+                _ => {}
             }
+            return Ok(true);
         }
-
-        Ok(())
+        Ok(false)
     }
 
     pub fn handle_key(&mut self, key: crossterm::event::KeyEvent) {
@@ -46,7 +60,7 @@ impl App {
                 self.show_status("canceled file write".to_string());
             }
 
-            KeyCode::Char('e') if 
+            KeyCode::Char('e') if
                     key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
                 self.toggle_explorer();
             }
@@ -63,8 +77,6 @@ impl App {
                 && key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
                 self.close_current_tab();
             }
-            
-            
 
             KeyCode::Char('s') if self.filename_prompt != true
                 && key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
@@ -118,7 +130,6 @@ impl App {
                 self.filename_prompt = false;
             }
 
-
             KeyCode::Char(c) => {
                 let at_word_start = c.is_whitespace()
                     || self.cursor.x == 0
@@ -130,13 +141,33 @@ impl App {
                         .map(|prev| prev.is_whitespace())
                         .unwrap_or(true);
 
-
-                if self.last_action != ActionKind::Insert || (at_word_start && !c.is_whitespace()) {
+                if self.last_action != ActionKind::Insert
+                    || (at_word_start && !c.is_whitespace())
+                {
                     self.push_undo();
                 }
 
                 self.document.insert_char(self.cursor.x, self.cursor.y, c);
                 self.cursor.x += 1;
+
+                let path = if self.current_file.is_empty() {
+                    None
+                } else {
+                    Some(std::path::PathBuf::from(&self.current_file))
+                };
+
+                if let (Some(path), Some(lsp)) = (path, self.lsp.as_mut()) {
+                    let text = self.document.lines.join("\n");
+
+                    if let Err(e) = lsp.did_change(&path, &text) {
+                        crate::debug::log(format!("did_change failed: {e}"));
+                    }
+
+                    if let Err(e) = lsp.completion(&path, self.cursor.y, self.cursor.x) {
+                        crate::debug::log(format!("completion failed: {e}"));
+                    }
+                }
+
                 self.last_action = ActionKind::Insert;
             }
             KeyCode::Enter => {

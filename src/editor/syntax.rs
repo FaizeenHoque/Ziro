@@ -10,6 +10,14 @@ pub struct Highlighter {
     pub theme_set: ThemeSet,
 }
 
+// SyntaxSet/ThemeSet don't implement Debug, so this is hand-rolled purely
+// to satisfy `#[derive(Debug)]` on App, which holds a Highlighter.
+impl std::fmt::Debug for Highlighter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Highlighter").finish()
+    }
+}
+
 impl Highlighter {
     pub fn new() -> Self {
         Self {

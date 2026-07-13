@@ -8,6 +8,7 @@ use ratatui::{
     Frame,
 };
 
+use crate::lsp::{LspClient, LspMessage};
 use crate::management::{TabItem, UndoState};
 use crate::ui::Theme;
 use crate::{
@@ -19,22 +20,24 @@ use crate::{
 pub struct App {
     pub document: Document,
     pub theme: Theme,
+    pub lsp_messages: Vec<LspMessage>,
+    pub lsp: Option<LspClient>,
     pub cursor: Cursor,
     pub highlighter: Highlighter,
-    
+
     pub undo_stack: Vec<UndoState>,
     pub redo_stack: Vec<UndoState>,
     pub last_action: ActionKind,
     pub last_saved: Vec<String>,
-    
+
     pub scroll_y: usize,
     pub viewport_height: Cell<usize>,
     pub number_col_width: u16,
     pub editor_area: Cell<Rect>,
-    
+
     pub current_file: String,
     pub filename_input: String,
-    
+
     pub status_text: String,
     pub status: bool,
     pub filename_prompt: bool,
@@ -53,7 +56,7 @@ pub struct App {
 
     pub dragging_entry: Option<usize>,
     pub entry_drag_target: Option<usize>,
-    
+
     pub pending_quit_after_save: bool,
     pub exit: bool,
 }
@@ -66,12 +69,6 @@ pub enum ActionKind {
     Newline,
 }
 
-impl std::fmt::Debug for Highlighter {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Highlighter").finish()
-    }
-}
-
 impl Default for App {
     fn default() -> Self {
         let document = Document::default();
@@ -79,27 +76,29 @@ impl Default for App {
         Self {
             document,
             theme: Theme::by_name("matte"),
-            
+            lsp: LspClient::new().ok(),
+            lsp_messages: Vec::new(),
+
             current_file: String::new(),
             highlighter: Highlighter::new(),
             cursor: Cursor::default(),
-            
+
             viewport_height: Cell::new(20),
             number_col_width: 7,
             scroll_y: 0,
             editor_area: Cell::new(Rect::default()),
-            
+
             filename_input: String::new(),
             status_text: String::new(),
-            
+
             undo_stack: Vec::new(),
             redo_stack: Vec::new(),
             last_action: ActionKind::None,
             last_saved,
-            
+
             filename_prompt: false,
             show_explorer: false,
-            
+
             explorer_area: Cell::new(Rect::default()),
             explorer_entries: Vec::new(),
             explorer_selected: 0,
@@ -129,6 +128,10 @@ impl App {
         if let Some(filename) = file {
             app.push_file_to_tabs(Path::new(&filename));
         }
+        if let Some(lsp) = app.lsp.as_mut() {
+            lsp.initialize()?;
+            lsp.initialized()?;
+        }
         Ok(app)
     }
 
@@ -137,17 +140,17 @@ impl App {
             terminal.draw(|frame| {
                 self.draw(frame);
             })?;
-            
+
             self.handle_events()?;
         }
-        
+
         Ok(())
     }
 
     fn draw(&mut self, frame: &mut Frame) {
         ui::draw(frame, self);
         let area = frame.area();
-        
+
         if self.filename_prompt == true  {
             let popup_x = area.width.saturating_sub(40) / 2;
             let popup_y = area.height.saturating_sub(5) / 2;
@@ -182,7 +185,7 @@ impl App {
 
     pub fn switch_to_file(&mut self, tab: TabItem) {
         self.save_current_tab_state();
-        
+
         match Document::from_file(tab.path.to_str().unwrap_or_default()) {
             Ok(doc) => {
                 self.document = doc;
@@ -191,8 +194,19 @@ impl App {
                 self.cursor.x = tab.cursor.x;
                 self.cursor.y = tab.cursor.y;
                 self.scroll_y = tab.scroll_y;
+                let path = std::path::PathBuf::from(&self.current_file);
+                let text = self.document.lines.join("\n");
+
+                if let Some(lsp) = self.lsp.as_mut() {
+                    if let Err(e) = lsp.did_open(&path, &text) {
+                        crate::debug::log(format!("did_open failed: {e}"));
+                    }
+                }
             }
-            Err(_) => self.show_status("failed to open file".to_string()),
+
+            Err(_) => {
+                self.show_status("failed to open file".to_string());
+            }
         }
     }
 

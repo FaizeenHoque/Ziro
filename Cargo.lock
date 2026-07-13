@@ -2031,11 +2031,13 @@ dependencies = [
 
 [[package]]
 name = "ziro"
-version = "2.2.3"
+version = "3.3.2"
 dependencies = [
  "color-eyre",
  "crossterm",
  "ratatui",
+ "serde",
+ "serde_json",
  "syntect",
 ]
 

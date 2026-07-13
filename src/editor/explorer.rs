@@ -68,6 +68,7 @@ impl App {
 
         if source.is_dir && target_dir.starts_with(&source.path) {
             self.show_status("cannot move a folder into itself".to_string());
+            return;
         }
 
         let file_name = match source.path.file_name() {
