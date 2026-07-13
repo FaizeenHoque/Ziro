@@ -91,6 +91,8 @@ pub struct CompletionItem {
 
     #[serde(default)]
     pub kind: Option<u32>,
+    #[serde(default, rename = "insertText")] pub insert_text: Option<String>,
+    #[serde(default, rename = "insertTextFormat")] pub insert_text_format: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -100,6 +102,14 @@ pub struct Hover {
 
     #[serde(default)]
     pub range: Option<Range>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SemanticToken {
+    pub start: usize,
+    pub length: usize,
+    pub token_type: String,
+    pub modifiers: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

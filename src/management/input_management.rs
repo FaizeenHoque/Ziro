@@ -15,14 +15,15 @@ impl App {
         // NOTE: only LspMessage::Completion is handled right now; the rest
         // (Diagnostics, Hover, Definition, Initialized, Json) are not yet
         // wired to any UI state. Add arms here as those features land.
-        if let Some(lsp) = self.lsp.as_mut() {
-            while let Some(msg) = lsp.try_recv() {
-                if let LspMessage::Completion(items) = msg {
-                    crate::debug::log(format!("{} completion items", items.len()));
-                    for item in items {
-                        crate::debug::log(format!("  {}", item.label));
-                    }
-                }
+        self.poll_hover();
+        while let Some(message) = self.lsp.as_ref().and_then(|lsp| lsp.try_recv()) {
+            match message {
+                LspMessage::Initialized(legend) => { if let Some(lsp) = self.lsp.as_mut() { let _ = lsp.initialized(); } self.semantic_legend = legend; self.lsp_ready = true; self.open_current_document(); }
+                LspMessage::Completion(mut items) => { let prefix = self.document.lines[self.cursor.y][..self.cursor.x].rsplit(|character: char| !character.is_alphanumeric() && character != '_').next().unwrap_or_default().to_lowercase(); if !prefix.is_empty() { items.retain(|item| item.label.to_lowercase().starts_with(&prefix)); } self.completions = items; self.completion_selected = 0; }
+                LspMessage::Diagnostics(uri, items) if uri == crate::lsp::protocol::path_to_uri(std::path::Path::new(&self.current_file)) => self.diagnostics = items,
+                LspMessage::Hover(line, character, hover) if self.hover_position == Some((line, character)) => self.hover = hover,
+                LspMessage::SemanticTokens(data) => self.set_semantic_tokens(data),
+                _ => {}
             }
         }
 
@@ -51,6 +52,7 @@ impl App {
         if self.status {
             self.reset_status();
         }
+        if !self.completions.is_empty() { match key.code { KeyCode::Esc => { self.completions.clear(); return; }, KeyCode::Up => { self.completion_selected = self.completion_selected.saturating_sub(1); return; }, KeyCode::Down => { self.completion_selected = (self.completion_selected + 1).min(self.completions.len() - 1); return; }, KeyCode::Enter | KeyCode::Tab => { self.accept_completion(); return; }, _ => {} } }
 
         match key.code {
             KeyCode::Esc if self.filename_prompt == true => {
@@ -149,24 +151,9 @@ impl App {
 
                 self.document.insert_char(self.cursor.x, self.cursor.y, c);
                 self.cursor.x += 1;
+                if c == '(' { self.document.insert_char(self.cursor.x, self.cursor.y, ')'); }
 
-                let path = if self.current_file.is_empty() {
-                    None
-                } else {
-                    Some(std::path::PathBuf::from(&self.current_file))
-                };
-
-                if let (Some(path), Some(lsp)) = (path, self.lsp.as_mut()) {
-                    let text = self.document.lines.join("\n");
-
-                    if let Err(e) = lsp.did_change(&path, &text) {
-                        crate::debug::log(format!("did_change failed: {e}"));
-                    }
-
-                    if let Err(e) = lsp.completion(&path, self.cursor.y, self.cursor.x) {
-                        crate::debug::log(format!("completion failed: {e}"));
-                    }
-                }
+                self.document_changed(!c.is_whitespace());
 
                 self.last_action = ActionKind::Insert;
             }
@@ -175,6 +162,7 @@ impl App {
                 self.document.split_line(self.cursor.x, self.cursor.y);
                 self.cursor.y += 1;
                 self.cursor.x = 0;
+                self.document_changed(false);
                 self.last_action = ActionKind::Newline;
             }
             KeyCode::Backspace => {
@@ -184,14 +172,17 @@ impl App {
                 let (x, y) = self.document.backspace(self.cursor.x, self.cursor.y);
                 self.cursor.x = x;
                 self.cursor.y = y;
+                self.document_changed(false);
                 self.last_action = ActionKind::Delete;
             }
             KeyCode::Up => {
+                self.hover = None; self.hover_pending = None; self.hover_position = None;
                 self.cursor.y = self.cursor.y.saturating_sub(1);
                 self.cursor.x = self.cursor.x.min(self.document.lines[self.cursor.y].len());
                 self.last_action = ActionKind::None;
             }
             KeyCode::Down => {
+                self.hover = None; self.hover_pending = None; self.hover_position = None;
                 if self.cursor.y + 1 < self.document.lines.len() {
                     self.cursor.y += 1;
                     self.cursor.x = self.cursor.x.min(self.document.lines[self.cursor.y].len());
@@ -199,10 +190,12 @@ impl App {
                 self.last_action = ActionKind::None;
             }
             KeyCode::Left => {
+                self.hover = None; self.hover_pending = None; self.hover_position = None;
                 self.cursor.x = self.cursor.x.saturating_sub(1);
                 self.last_action = ActionKind::None;
             }
             KeyCode::Right => {
+                self.hover = None; self.hover_pending = None; self.hover_position = None;
                 let line_length = self.document.lines[self.cursor.y].len();
                 if self.cursor.x < line_length {
                     self.cursor.x += 1;
@@ -216,8 +209,11 @@ impl App {
         self.update_scroll(self.viewport_height.get());
     }
 
+    fn accept_completion(&mut self) { let Some(item) = self.completions.get(self.completion_selected) else { return; }; let mut text = item.insert_text.clone().unwrap_or_else(|| item.label.clone()); let mut cursor = text.len(); if matches!(item.kind, Some(2..=4)) { if !text.contains('(') { text.push_str("()"); } cursor = text.find('(').map_or(text.len(), |index| index + 1); } let start = self.document.lines[self.cursor.y][..self.cursor.x].rfind(|c: char| !c.is_alphanumeric() && c != '_').map_or(0, |index| index + 1); self.document.lines[self.cursor.y].replace_range(start..self.cursor.x, &text); self.cursor.x = start + cursor; self.completions.clear(); self.document_changed(false); }
+
     pub fn handle_mouse(&mut self, mouse: MouseEvent) {
         match mouse.kind {
+            MouseEventKind::Moved => self.request_hover_at(mouse.column, mouse.row),
             MouseEventKind::Down(MouseButton::Left) => {
                 if Self::point_in_rect(mouse.column, mouse.row, self.tabs_area.get()) {
                     self.start_tab_drag(mouse);
