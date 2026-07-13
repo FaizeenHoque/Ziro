@@ -105,7 +105,7 @@ curl -sSL https://ziro.faizeenhoque.dev/install-rolling.sh | bash
 * [x] Editor UI
 * [x] File open/save
 * [x] Syntax highlighting
-* [ ] LSP integration
+* [x] LSP integration
 * [ ] Config system
 * [ ] Plugin system
 

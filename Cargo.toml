@@ -5,6 +5,7 @@ description = "The better text editor"
 authors = ["Faizeen Hoque <me@faizeenhoque.dev>"]
 license = "MIT"
 edition = "2024"
+default-run = "ziro"
 
 [dependencies]
 color-eyre = "0.6.3"
