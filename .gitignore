@@ -3,3 +3,4 @@ release.sh
 /temp
 settings.json
 tree.txt
+*.log

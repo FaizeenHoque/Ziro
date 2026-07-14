@@ -1,21 +1,19 @@
-use std::{collections::{BTreeMap, HashMap}, path::Path, time::{Duration, Instant}};
-use std::{io, path::PathBuf};
 use std::cell::Cell;
+use std::{
+    collections::{BTreeMap, HashMap},
+    path::Path,
+    time::{Duration, Instant},
+};
+use std::{io, path::PathBuf};
 
 use ratatui::layout::Rect;
-use ratatui::{
-    DefaultTerminal,
-    Frame,
-};
+use ratatui::{DefaultTerminal, Frame};
 
-use crate::lsp::{LspClient, LspSession, LspStatus};
 use crate::lsp::protocol::{CompletionItem, Diagnostic, Hover, SemanticToken};
+use crate::lsp::{LspClient, LspSession, LspStatus};
 use crate::management::{TabItem, UndoState};
 use crate::ui::Theme;
-use crate::{
-    editor::*, ui,
-};
-
+use crate::{editor::*, ui};
 
 #[derive(Debug)]
 pub struct App {
@@ -24,7 +22,13 @@ pub struct App {
     pub lsp_sessions: HashMap<String, LspSession>,
     pub semantic_tokens: BTreeMap<usize, Vec<SemanticToken>>,
     pub semantic_refresh: Option<Instant>,
-    pub diagnostics: Vec<Diagnostic>, pub completions: Vec<CompletionItem>, pub completion_selected: usize, pub hover: Option<Hover>, pub hover_position: Option<(usize, usize)>, pub hover_anchor: Option<(u16, u16)>, pub hover_pending: Option<(usize, usize, u16, u16, Instant)>,
+    pub diagnostics: Vec<Diagnostic>,
+    pub completions: Vec<CompletionItem>,
+    pub completion_selected: usize,
+    pub hover: Option<Hover>,
+    pub hover_position: Option<(usize, usize)>,
+    pub hover_anchor: Option<(u16, u16)>,
+    pub hover_pending: Option<(usize, usize, u16, u16, Instant)>,
     pub cursor: Cursor,
     pub highlighter: Highlighter,
 
@@ -80,7 +84,15 @@ impl Default for App {
             document,
             theme: Theme::by_name("matte"),
             lsp_sessions: HashMap::new(),
-            semantic_tokens: BTreeMap::new(), semantic_refresh: None, diagnostics: Vec::new(), completions: Vec::new(), completion_selected: 0, hover: None, hover_position: None, hover_anchor: None, hover_pending: None,
+            semantic_tokens: BTreeMap::new(),
+            semantic_refresh: None,
+            diagnostics: Vec::new(),
+            completions: Vec::new(),
+            completion_selected: 0,
+            hover: None,
+            hover_position: None,
+            hover_anchor: None,
+            hover_pending: None,
 
             current_file: String::new(),
             highlighter: Highlighter::new(),
@@ -128,11 +140,13 @@ pub const EXPLORER_WIDTH: u16 = 40;
 impl App {
     pub fn new(file: Option<String>) -> io::Result<Self> {
         let mut app = Self::default();
-        if let Some(filename) = file { app.push_file_to_tabs(Path::new(&filename)); }
+        if let Some(filename) = file {
+            app.push_file_to_tabs(Path::new(&filename));
+        }
         Ok(app)
     }
 
-    pub fn run(&mut self, terminal: &mut DefaultTerminal,) -> io::Result<()> {
+    pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
         while !self.exit {
             terminal.draw(|frame| {
                 self.draw(frame);
@@ -155,13 +169,11 @@ impl App {
         ui::draw(frame, self);
         let area = frame.area();
 
-        if self.filename_prompt == true  {
+        if self.filename_prompt == true {
             let popup_x = area.width.saturating_sub(40) / 2;
             let popup_y = area.height.saturating_sub(5) / 2;
-            frame.set_cursor_position((
-                popup_x + 1 + self.filename_input.len() as u16,
-                popup_y + 2,
-            ));
+            frame
+                .set_cursor_position((popup_x + 1 + self.filename_input.len() as u16, popup_y + 2));
         } else {
             let ea = self.editor_area.get();
             let x = ea.x + self.number_col_width + self.cursor.x as u16;
@@ -175,12 +187,15 @@ impl App {
     }
 
     pub fn point_in_rect(col: u16, row: u16, area: Rect) -> bool {
-        col >= area.x && col < area.x + area.width
-            && row >= area.y && row < area.y + area.height
+        col >= area.x && col < area.x + area.width && row >= area.y && row < area.y + area.height
     }
 
     pub fn editor_x_offset(&self) -> u16 {
-        if self.show_explorer { EXPLORER_WIDTH } else { 0 }
+        if self.show_explorer {
+            EXPLORER_WIDTH
+        } else {
+            0
+        }
     }
 
     pub fn is_dirty(&self) -> bool {
@@ -188,7 +203,10 @@ impl App {
     }
 
     pub fn language_name(&self) -> &'static str {
-        match Path::new(&self.current_file).extension().and_then(|extension| extension.to_str()) {
+        match Path::new(&self.current_file)
+            .extension()
+            .and_then(|extension| extension.to_str())
+        {
             Some("rs") => "Rust",
             Some("py") => "Python",
             Some("js" | "jsx") => "JavaScript",
@@ -222,8 +240,12 @@ impl App {
     /// doesn't exist yet. Does nothing if no server is installed —
     /// editing stays syntect-only, never blocked.
     pub fn ensure_lsp_session(&mut self) {
-        let Some(language) = self.language_id() else { return; };
-        if self.lsp_sessions.contains_key(language) { return; }
+        let Some(language) = self.language_id() else {
+            return;
+        };
+        if self.lsp_sessions.contains_key(language) {
+            return;
+        }
 
         let Some((binary, args)) = crate::lsp::registry::find_server(language) else {
             return;
@@ -231,16 +253,22 @@ impl App {
 
         match LspClient::spawn(&binary, args, language) {
             Ok(mut client) => {
-                let start = Path::new(&self.current_file).parent()
+                let start = Path::new(&self.current_file)
+                    .parent()
                     .map(Path::to_path_buf)
-                    .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+                    .unwrap_or_else(|| {
+                        std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+                    });
                 let root = crate::lsp::registry::find_root(&start, language);
                 let _ = client.initialize(&root);
-                self.lsp_sessions.insert(language.to_string(), LspSession {
-                    client,
-                    status: LspStatus::Initializing,
-                    semantic_legend: Vec::new(),
-                });
+                self.lsp_sessions.insert(
+                    language.to_string(),
+                    LspSession {
+                        client,
+                        status: LspStatus::Initializing,
+                        semantic_legend: Vec::new(),
+                    },
+                );
             }
             Err(_) => {
                 // Binary was found on PATH but failed to spawn (permissions,
@@ -254,13 +282,16 @@ impl App {
         match self.language_id() {
             None => "n/a".to_string(),
             Some(language) => match self.lsp_sessions.get(language) {
-                Some(session) => format!("{language} {}", match session.status {
-                    LspStatus::Initializing => "initializing",
-                    LspStatus::Alive => "alive",
-                    LspStatus::Offline => "offline",
-                }),
+                Some(session) => format!(
+                    "{language} {}",
+                    match session.status {
+                        LspStatus::Initializing => "initializing",
+                        LspStatus::Alive => "alive",
+                        LspStatus::Offline => "offline",
+                    }
+                ),
                 None => format!("{language}: none found"),
-            }
+            },
         }
     }
 
@@ -321,7 +352,8 @@ impl App {
         self.semantic_tokens.clear();
         self.semantic_refresh = Some(Instant::now());
 
-        let Some(path) = (!self.current_file.is_empty()).then(|| PathBuf::from(&self.current_file)) else {
+        let Some(path) = (!self.current_file.is_empty()).then(|| PathBuf::from(&self.current_file))
+        else {
             return;
         };
 
@@ -341,9 +373,16 @@ impl App {
     }
 
     pub fn open_current_document(&mut self) {
-        if self.current_file.is_empty() { return; }
-        let is_alive = self.current_session().map(|s| s.status == LspStatus::Alive).unwrap_or(false);
-        if !is_alive { return; }
+        if self.current_file.is_empty() {
+            return;
+        }
+        let is_alive = self
+            .current_session()
+            .map(|s| s.status == LspStatus::Alive)
+            .unwrap_or(false);
+        if !is_alive {
+            return;
+        }
         let path = Path::new(&self.current_file).to_path_buf();
         let text = self.document.lines.join("\n");
         if let Some(session) = self.current_session_mut() {
@@ -357,15 +396,32 @@ impl App {
         let (mut line, mut start) = (0usize, 0usize);
         for chunk in data.chunks_exact(5) {
             line += chunk[0] as usize;
-            start = if chunk[0] == 0 { start + chunk[1] as usize } else { chunk[1] as usize };
+            start = if chunk[0] == 0 {
+                start + chunk[1] as usize
+            } else {
+                chunk[1] as usize
+            };
             if let Some(token_type) = legend.get(chunk[3] as usize).cloned() {
-                self.semantic_tokens.entry(line).or_default().push(SemanticToken { start, length: chunk[2] as usize, token_type, modifiers: chunk[4] });
+                self.semantic_tokens
+                    .entry(line)
+                    .or_default()
+                    .push(SemanticToken {
+                        start,
+                        length: chunk[2] as usize,
+                        token_type,
+                        modifiers: chunk[4],
+                    });
             }
         }
     }
 
     pub fn poll_semantic_tokens(&mut self) {
-        if self.semantic_refresh.is_none_or(|time| time.elapsed() < Duration::from_millis(250)) { return; }
+        if self
+            .semantic_refresh
+            .is_none_or(|time| time.elapsed() < Duration::from_millis(250))
+        {
+            return;
+        }
         self.semantic_refresh = None;
         let path = Path::new(&self.current_file).to_path_buf();
         if let Some(session) = self.current_session_mut() {
@@ -374,21 +430,40 @@ impl App {
     }
 
     pub fn request_hover_at(&mut self, column: u16, row: u16) {
-        let area = self.editor_area.get(); let x = area.x + self.number_col_width;
-        if row < area.y || row >= area.y + area.height || column < x { self.hover_pending = None; self.hover = None; return; }
+        let area = self.editor_area.get();
+        let x = area.x + self.number_col_width;
+        if row < area.y || row >= area.y + area.height || column < x {
+            self.hover_pending = None;
+            self.hover = None;
+            return;
+        }
         let line = self.scroll_y + (row - area.y) as usize;
-        let Some(text) = self.document.lines.get(line) else { return; };
+        let Some(text) = self.document.lines.get(line) else {
+            return;
+        };
         let offset = (column - x) as usize;
-        let Some((index, character)) = text.char_indices().nth(offset) else { self.hover_pending = None; self.hover = None; return; };
-        if !character.is_alphanumeric() && character != '_' { self.hover_pending = None; self.hover = None; return; }
+        let Some((index, character)) = text.char_indices().nth(offset) else {
+            self.hover_pending = None;
+            self.hover = None;
+            return;
+        };
+        if !character.is_alphanumeric() && character != '_' {
+            self.hover_pending = None;
+            self.hover = None;
+            return;
+        }
         let position = text[..index].encode_utf16().count();
         self.hover = None;
         self.hover_pending = Some((line, position, column, row, Instant::now()));
     }
 
     pub fn poll_hover(&mut self) {
-        let Some((line, character, x, y, since)) = self.hover_pending else { return; };
-        if since.elapsed() < Duration::from_millis(300) { return; }
+        let Some((line, character, x, y, since)) = self.hover_pending else {
+            return;
+        };
+        if since.elapsed() < Duration::from_millis(300) {
+            return;
+        }
         self.hover_pending = None;
         self.hover_position = Some((line, character));
         self.hover_anchor = Some((x, y));
