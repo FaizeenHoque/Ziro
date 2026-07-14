@@ -1,5 +1,5 @@
 use crate::app::{ActionKind, App};
-use crossterm::event::KeyCode;
+use crossterm::event::{KeyCode, KeyModifiers};
 
 impl App {
     pub fn handle_key(&mut self, key: crossterm::event::KeyEvent) {
@@ -308,17 +308,13 @@ impl App {
                 self.last_action = ActionKind::Delete;
             }
             KeyCode::Up => {
-                self.hover = None;
-                self.hover_pending = None;
-                self.hover_position = None;
+                self.clear_hover();
                 self.cursor.y = self.cursor.y.saturating_sub(1);
                 self.cursor.x = self.cursor.x.min(self.document.lines[self.cursor.y].len());
                 self.last_action = ActionKind::None;
             }
             KeyCode::Down => {
-                self.hover = None;
-                self.hover_pending = None;
-                self.hover_position = None;
+                self.clear_hover();
                 if self.cursor.y + 1 < self.document.lines.len() {
                     self.cursor.y += 1;
                     self.cursor.x = self.cursor.x.min(self.document.lines[self.cursor.y].len());
@@ -326,10 +322,18 @@ impl App {
                 self.last_action = ActionKind::None;
             }
             KeyCode::Left => {
-                self.hover = None;
-                self.hover_pending = None;
-                self.hover_position = None;
-                if self.cursor.x == 0 {
+                self.clear_hover();
+                if key.modifiers.contains(KeyModifiers::CONTROL) {
+                    if self.cursor.x == 0 {
+                        if self.cursor.y > 0 {
+                            self.cursor.y -= 1;
+                            self.cursor.x = self.document.lines[self.cursor.y].len();
+                        }
+                    } else {
+                        self.cursor.x =
+                            Self::word_left(&self.document.lines[self.cursor.y], self.cursor.x);
+                    }
+                } else if self.cursor.x == 0 {
                     if self.cursor.y > 0 {
                         self.cursor.y -= 1;
                         self.cursor.x = self.document.lines[self.cursor.y].len();
@@ -340,11 +344,19 @@ impl App {
                 self.last_action = ActionKind::None;
             }
             KeyCode::Right => {
-                self.hover = None;
-                self.hover_pending = None;
-                self.hover_position = None;
+                self.clear_hover();
                 let line_length = self.document.lines[self.cursor.y].len();
-                if self.cursor.x < line_length {
+                if key.modifiers.contains(KeyModifiers::CONTROL) {
+                    if self.cursor.x >= line_length {
+                        if self.cursor.y + 1 < self.document.lines.len() {
+                            self.cursor.y += 1;
+                            self.cursor.x = 0;
+                        }
+                    } else {
+                        self.cursor.x =
+                            Self::word_right(&self.document.lines[self.cursor.y], self.cursor.x);
+                    }
+                } else if self.cursor.x < line_length {
                     self.cursor.x += 1;
                 } else if self.cursor.y + 1 < self.document.lines.len() {
                     self.cursor.y += 1;
@@ -357,5 +369,73 @@ impl App {
         }
 
         self.update_scroll(self.viewport_height.get());
+    }
+}
+
+impl App {
+    fn word_left(line: &str, idx: usize) -> usize {
+        let head = &line[..idx];
+        let mut offset = 0usize;
+        let mut chars = head.chars().rev().peekable();
+
+        while let Some(&c) = chars.peek() {
+            if c.is_whitespace() {
+                offset += c.len_utf8();
+                chars.next();
+            } else {
+                break;
+            }
+        }
+
+        if let Some(&c0) = chars.peek() {
+            let is_word = |c: char| c.is_alphanumeric() || c == '_';
+            let starting_is_word = is_word(c0);
+            while let Some(&c) = chars.peek() {
+                if !c.is_whitespace() && is_word(c) == starting_is_word {
+                    offset += c.len_utf8();
+                    chars.next();
+                } else {
+                    break;
+                }
+            }
+        }
+
+        idx - offset
+    }
+
+    fn word_right(line: &str, idx: usize) -> usize {
+        let rest = &line[idx..];
+        let mut offset = 0usize;
+        let mut chars = rest.chars().peekable();
+
+        while let Some(&c) = chars.peek() {
+            if c.is_whitespace() {
+                offset += c.len_utf8();
+                chars.next();
+            } else {
+                break;
+            }
+        }
+
+        if let Some(&c0) = chars.peek() {
+            let is_word = |c: char| c.is_alphanumeric() || c == '_';
+            let starting_is_word = is_word(c0);
+            while let Some(&c) = chars.peek() {
+                if !c.is_whitespace() && is_word(c) == starting_is_word {
+                    offset += c.len_utf8();
+                    chars.next();
+                } else {
+                    break;
+                }
+            }
+        }
+
+        idx + offset
+    }
+
+    fn clear_hover(&mut self) {
+        self.hover = None;
+        self.hover_pending = None;
+        self.hover_position = None;
     }
 }
