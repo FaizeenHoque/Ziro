@@ -472,4 +472,14 @@ impl App {
             let _ = session.client.hover(&path, line, character);
         }
     }
+
+    pub fn clamp_cursor_x(&mut self) {
+        let line_len = self
+            .document
+            .lines
+            .get(self.cursor.y)
+            .map(|l| l.chars().count())
+            .unwrap_or(0);
+        self.cursor.x = self.cursor.x.min(line_len);
+    }
 }
