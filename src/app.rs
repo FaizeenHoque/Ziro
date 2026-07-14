@@ -31,6 +31,7 @@ pub struct App {
     pub hover_pending: Option<(usize, usize, u16, u16, Instant)>,
     pub cursor: Cursor,
     pub highlighter: Highlighter,
+    pub last_line_count: usize,
 
     pub undo_stack: Vec<UndoState>,
     pub redo_stack: Vec<UndoState>,
@@ -80,6 +81,8 @@ impl Default for App {
     fn default() -> Self {
         let document = Document::default();
         let last_saved = document.lines.clone();
+        let last_line_count = document.lines.len();
+
         Self {
             document,
             theme: Theme::by_name("matte"),
@@ -93,6 +96,7 @@ impl Default for App {
             hover_position: None,
             hover_anchor: None,
             hover_pending: None,
+            last_line_count,
 
             current_file: String::new(),
             highlighter: Highlighter::new(),
@@ -348,8 +352,19 @@ impl App {
         self.hover_pending = None;
         self.hover_position = None;
         self.completions.clear();
-        self.diagnostics.clear();
-        self.semantic_tokens.clear();
+
+        let current_line_count = self.document.lines.len();
+        if current_line_count != self.last_line_count {
+            // Line count changed (Enter, or a backspace that merged two lines) —
+            // every semantic token / diagnostic below the edit point now points
+            // at the wrong line. Stale-but-same-shape data is fine to keep
+            // briefly; stale-and-wrong-shape data is what produces garbled
+            // highlighting, so this is the one case where clearing is correct.
+            self.semantic_tokens.clear();
+            self.diagnostics.clear();
+            self.last_line_count = current_line_count;
+        }
+
         self.semantic_refresh = Some(Instant::now());
 
         let Some(path) = (!self.current_file.is_empty()).then(|| PathBuf::from(&self.current_file))
@@ -371,7 +386,6 @@ impl App {
             }
         }
     }
-
     pub fn open_current_document(&mut self) {
         if self.current_file.is_empty() {
             return;

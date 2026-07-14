@@ -70,6 +70,12 @@ impl App {
                     self.cursor.y = y;
                 }
 
+                if self.cursor.x == 0 && self.cursor.y > 0 {
+                    let (x, y) = self.document.backspace(self.cursor.x, self.cursor.y);
+                    self.cursor.x = x;
+                    self.cursor.y = y;
+                }
+
                 self.document_changed(false);
                 self.last_action = ActionKind::Delete;
             }
@@ -81,34 +87,6 @@ impl App {
                     && !key.modifiers.contains(crossterm::event::KeyModifiers::ALT) =>
             {
                 self.filename_input.push(c);
-            }
-            KeyCode::Char(c)
-                if !key
-                    .modifiers
-                    .contains(crossterm::event::KeyModifiers::CONTROL)
-                    && !key.modifiers.contains(crossterm::event::KeyModifiers::ALT) =>
-            {
-                let at_word_start = c.is_whitespace()
-                    || self.cursor.x == 0
-                    || self.document.lines[self.cursor.y]
-                        .chars()
-                        .nth(self.cursor.x - 1)
-                        .map(|prev| prev.is_whitespace())
-                        .unwrap_or(true);
-
-                if self.last_action != ActionKind::Insert || (at_word_start && !c.is_whitespace()) {
-                    self.push_undo();
-                }
-
-                self.document.insert_char(self.cursor.x, self.cursor.y, c);
-                self.cursor.x += 1;
-                if c == '(' {
-                    self.document.insert_char(self.cursor.x, self.cursor.y, ')');
-                }
-
-                self.document_changed(!c.is_whitespace());
-
-                self.last_action = ActionKind::Insert;
             }
 
             KeyCode::Esc if self.filename_prompt == true => {
@@ -233,6 +211,17 @@ impl App {
                 self.cursor.x += 1;
                 if c == '(' {
                     self.document.insert_char(self.cursor.x, self.cursor.y, ')');
+                } else if c == '{' {
+                    self.document.insert_char(self.cursor.x, self.cursor.y, '}');
+                } else if c == '[' {
+                    self.document.insert_char(self.cursor.x, self.cursor.y, ']');
+                } else if c == '"' {
+                    self.document.insert_char(self.cursor.x, self.cursor.y, '"');
+                } else if c == '`' {
+                    self.document.insert_char(self.cursor.x, self.cursor.y, '`');
+                } else if c == '\'' {
+                    self.document
+                        .insert_char(self.cursor.x, self.cursor.y, '\'');
                 }
 
                 self.document_changed(!c.is_whitespace());
