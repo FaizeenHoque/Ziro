@@ -7,6 +7,7 @@ impl App {
         match mouse.kind {
             MouseEventKind::Moved => self.request_hover_at(mouse.column, mouse.row),
             MouseEventKind::Down(MouseButton::Left) => {
+                self.hover = None;
                 if Self::point_in_rect(mouse.column, mouse.row, self.tabs_area.get()) {
                     self.start_tab_drag(mouse);
                 } else if self.show_explorer
@@ -18,6 +19,7 @@ impl App {
                 }
             }
             MouseEventKind::Drag(MouseButton::Left) => {
+                self.hover = None;
                 if self.dragging_tab.is_some() {
                     self.update_tab_drag(mouse);
                 } else if self.dragging_entry.is_some() {
@@ -25,6 +27,7 @@ impl App {
                 }
             }
             MouseEventKind::Up(MouseButton::Left) => {
+                self.hover = None;
                 if self.dragging_tab.is_some() {
                     self.finish_tab_drag(mouse);
                 } else if self.dragging_entry.is_some() {
@@ -33,6 +36,7 @@ impl App {
             }
 
             MouseEventKind::ScrollUp => {
+                self.hover = None;
                 self.scroll_y = self.scroll_y.saturating_sub(3);
                 let bottom = self.scroll_y + self.viewport_height.get().saturating_sub(1);
                 if self.cursor.y > bottom {
@@ -41,6 +45,7 @@ impl App {
                 }
             }
             MouseEventKind::ScrollDown => {
+                self.hover = None;
                 let max_scroll = self
                     .document
                     .lines
