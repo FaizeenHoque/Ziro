@@ -2,9 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 pub fn path_to_uri(path: &Path) -> String {
-    let path = path
-        .canonicalize()
-        .unwrap_or_else(|_| path.to_path_buf());
+    let path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
 
     format!("file://{}", path.display())
 }
@@ -91,8 +89,10 @@ pub struct CompletionItem {
 
     #[serde(default)]
     pub kind: Option<u32>,
-    #[serde(default, rename = "insertText")] pub insert_text: Option<String>,
-    #[serde(default, rename = "insertTextFormat")] pub insert_text_format: Option<u32>,
+    #[serde(default, rename = "insertText")]
+    pub insert_text: Option<String>,
+    #[serde(default, rename = "insertTextFormat")]
+    pub insert_text_format: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

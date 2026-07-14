@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use crossterm::event::MouseEvent;
 
-use crate::app::{App};
+use crate::app::App;
 
 #[derive(Debug, Clone)]
 pub struct FileEntry {
@@ -14,10 +14,11 @@ pub struct FileEntry {
 }
 
 impl App {
-
     pub fn start_entry_drag(&mut self, mouse: MouseEvent) {
         let area = self.explorer_area.get();
-        if mouse.row < area.y { return; }
+        if mouse.row < area.y {
+            return;
+        }
 
         let row = (mouse.row - area.y) as usize;
         if row < self.explorer_entries.len() {
@@ -29,7 +30,9 @@ impl App {
 
     pub fn update_entry_drag(&mut self, mouse: MouseEvent) {
         let area = self.explorer_area.get();
-        if mouse.row < area.y { return; }
+        if mouse.row < area.y {
+            return;
+        }
 
         let row = (mouse.row - area.y) as usize;
         if row < self.explorer_entries.len() {
@@ -51,7 +54,7 @@ impl App {
         }
     }
 
-    fn move_entry(&mut self, source_index: usize, target_index:usize) {
+    fn move_entry(&mut self, source_index: usize, target_index: usize) {
         let source = match self.explorer_entries.get(source_index).cloned() {
             Some(e) => e,
             None => return,
@@ -62,7 +65,7 @@ impl App {
             Some(e) => match e.path.parent() {
                 Some(p) => p.to_path_buf(),
                 None => return,
-            }
+            },
             None => return,
         };
 
@@ -78,7 +81,9 @@ impl App {
 
         let dest = target_dir.join(file_name);
 
-        if dest == source.path { return; }
+        if dest == source.path {
+            return;
+        }
 
         match std::fs::rename(&source.path, &dest) {
             Ok(()) => {
@@ -93,10 +98,9 @@ impl App {
                 self.refresh_explorer();
                 self.show_status(format!("move to {}", dest.display()));
             }
-            Err(_)=>self.show_status("failed to move file".to_string()),
+            Err(_) => self.show_status("failed to move file".to_string()),
         }
     }
-
 
     pub fn refresh_explorer(&mut self) {
         self.explorer_entries = Self::read_dir_sorted(&self.explorer_cwd, 0);
@@ -104,11 +108,7 @@ impl App {
     }
 
     pub fn open_selected_entry(&mut self) {
-        let entry = match self
-            .explorer_entries
-            .get(self.explorer_selected)
-            .cloned()
-        {
+        let entry = match self.explorer_entries.get(self.explorer_selected).cloned() {
             Some(e) => e,
             None => return,
         };
@@ -118,10 +118,9 @@ impl App {
                 self.collapse_entry(self.explorer_selected);
             } else {
                 self.expand_entry(self.explorer_selected);
-            } 
+            }
         } else {
             self.push_file_to_tabs(&entry.path);
-
         }
     }
 
@@ -131,10 +130,10 @@ impl App {
             (entry.path.clone(), entry.depth)
         };
 
-        let children = Self::read_dir_sorted(&path, depth+1);
+        let children = Self::read_dir_sorted(&path, depth + 1);
 
         self.explorer_entries[index].expanded = true;
-        self.explorer_entries.splice(index+1..index+1, children);
+        self.explorer_entries.splice(index + 1..index + 1, children);
     }
 
     fn collapse_entry(&mut self, index: usize) {
@@ -149,7 +148,9 @@ impl App {
         self.explorer_entries.drain(index + 1..end);
         self.explorer_entries[index].expanded = false;
 
-        self.explorer_selected = self.explorer_selected.min(self.explorer_entries.len().saturating_sub(1));
+        self.explorer_selected = self
+            .explorer_selected
+            .min(self.explorer_entries.len().saturating_sub(1));
     }
 
     pub fn icon_for(path: &Path, is_dir: bool) -> &str {
@@ -182,7 +183,6 @@ impl App {
         }
     }
 
-
     pub fn read_dir_sorted(path: &PathBuf, depth: usize) -> Vec<FileEntry> {
         let mut entries: Vec<FileEntry> = match std::fs::read_dir(path) {
             Ok(read) => read
@@ -191,17 +191,23 @@ impl App {
                     let path = e.path();
                     let name = e.file_name().to_string_lossy().to_string();
                     let is_dir = path.is_dir();
-                    FileEntry { name, path, is_dir, depth, expanded: false}
-                }).collect(),
+                    FileEntry {
+                        name,
+                        path,
+                        is_dir,
+                        depth,
+                        expanded: false,
+                    }
+                })
+                .collect(),
             Err(_) => Vec::new(),
         };
         entries.sort_by(|a, b| match (a.is_dir, b.is_dir) {
             (true, false) => std::cmp::Ordering::Less,
             (false, true) => std::cmp::Ordering::Greater,
-            _=>a.name.to_lowercase().cmp(&b.name.to_lowercase()),        
+            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
         });
 
         entries
     }
-
 }
