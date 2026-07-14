@@ -11,6 +11,7 @@
 		{ id: 'opening-files', label: 'Opening Files' },
 		{ id: 'file-explorer', label: 'File Explorer' },
 		{ id: 'tabs-and-saving', label: 'Tabs & Saving' },
+		{ id: 'mouse', label: 'Mouse Controls' },
 		{ id: 'keybindings', label: 'Keybindings' },
 		{ id: 'undo-redo', label: 'Undo & Redo' },
 		{ id: 'syntax-highlighting', label: 'Syntax Highlighting' }
@@ -82,20 +83,24 @@
 			<section id="installation" class="scroll-mt-28 mb-16 mt-12">
 				<h2 class="font-mono text-[20px] tracking-tight mb-1">Installation</h2>
 				<p class="text-[14px] text-[#5B5C52] mb-4">
-					Ziro is currently only supported on <strong class="text-[#14140F]">Linux</strong>.
-					Tested on Arch Linux — other distros may work but are untested.
+					Ziro supports <strong class="text-[#14140F]">Linux</strong>,
+					<strong class="text-[#14140F]">macOS</strong> (Intel and Apple Silicon), and
+					<strong class="text-[#14140F]">Windows</strong>. Tested primarily on Arch Linux — other
+					Linux distros and macOS should work but are less thoroughly tested.
 				</p>
 
-				<h3 class="font-mono text-[15px] mt-8 mb-1">Stable</h3>
+				<h3 class="font-mono text-[15px] mt-8 mb-1">Stable (Linux &amp; macOS)</h3>
 				<p class="text-[14px] text-[#5B5C52]">Downloads a prebuilt binary. No Rust required.</p>
 				<CodeBlock
 					label="bash"
 					code={`curl -sSL https://ziro.faizeenhoque.dev/install.sh | bash`}
 				/>
 
-				<h3 class="font-mono text-[15px] mt-8 mb-1">Rolling</h3>
+				<h3 class="font-mono text-[15px] mt-8 mb-1">Rolling (Linux &amp; macOS)</h3>
 				<p class="text-[14px] text-[#5B5C52]">
-					Builds from the latest commit on <code class="font-mono text-[13px] bg-[#F5F4EE] px-1.5 py-0.5 rounded">main</code>. Requires Rust and Cargo.
+					Builds from the latest commit on <code
+						class="font-mono text-[13px] bg-[#F5F4EE] px-1.5 py-0.5 rounded">main</code
+					>. Requires Rust and Cargo.
 				</p>
 				<CodeBlock
 					label="bash"
@@ -106,6 +111,26 @@
 					Rolling may be unstable. Use stable unless you want the absolute latest changes.
 				</Callout>
 
+				<h3 class="font-mono text-[15px] mt-8 mb-1">Windows</h3>
+				<p class="text-[14px] text-[#5B5C52]">
+					There's no install script for Windows yet. Download
+					<code class="font-mono text-[13px] bg-[#F5F4EE] px-1.5 py-0.5 rounded"
+						>ziro-windows-x86_64.exe</code
+					>
+					directly from the
+					<a
+						href="https://github.com/FaizeenHoque/ziro/releases"
+						target="_blank"
+						rel="noreferrer"
+						class="text-[#14140F] underline underline-offset-2">GitHub Releases page</a
+					>
+					and run it, or place it somewhere on your <code>PATH</code>.
+				</p>
+				<Callout type="note">
+					The curl-bash scripts above are Linux/macOS only — they won't run natively in PowerShell
+					or cmd. Use the manual download until a proper Windows installer exists.
+				</Callout>
+
 				<h3 class="font-mono text-[15px] mt-8 mb-1">Building from source</h3>
 				<CodeBlock
 					label="bash"
@@ -113,12 +138,21 @@
 				/>
 				<p class="text-[14px] text-[#5B5C52]">
 					Requires Rust 1.78+. Install Rust from
-					<a href="https://rustup.rs" target="_blank" rel="noreferrer" class="text-[#14140F] underline underline-offset-2">rustup.rs</a>.
+					<a
+						href="https://rustup.rs"
+						target="_blank"
+						rel="noreferrer"
+						class="text-[#14140F] underline underline-offset-2">rustup.rs</a
+					>. On Windows, build with
+					<code>cargo build --release --target x86_64-pc-windows-msvc</code>
+					instead of moving to <code>/usr/local/bin</code> — copy the resulting <code>.exe</code>
+					wherever you keep it.
 				</p>
 
 				<Callout type="note">
-					Both install scripts require <code>sudo</code> to move the binary to <code>/usr/local/bin</code>.
-					Read the script before running if you're cautious about piping curl to bash.
+					Both install scripts require <code>sudo</code> to move the binary to
+					<code>/usr/local/bin</code>. Read the script before running if you're cautious about
+					piping curl to bash.
 				</Callout>
 			</section>
 
@@ -129,8 +163,8 @@
 					code={`ziro              # open a blank buffer\nziro file.txt     # open a specific file`}
 				/>
 				<p class="text-[14px] text-[#5B5C52]">
-					If you open Ziro without a file, you'll start with a blank buffer. You'll be prompted
-					for a filename the first time you save.
+					If you open Ziro without a file, you'll start with a blank buffer. You'll be prompted for
+					a filename the first time you save.
 				</p>
 			</section>
 
@@ -138,8 +172,8 @@
 				<h2 class="font-mono text-[20px] tracking-tight mb-1">File Explorer</h2>
 				<p class="text-[14px] text-[#5B5C52] mb-4">
 					The explorer opens as a sidebar and keeps folder state inline instead of jumping between
-					directories. Click a folder to expand or collapse it. Click a file to load it in the editor.
-					Drag entries to move them within the tree.
+					directories. Click a folder to expand or collapse it. Click a file to load it in the
+					editor. Drag entries to move them within the tree.
 				</p>
 				<DocsTable
 					headers={['Key', 'Action']}
@@ -181,6 +215,26 @@
 				</Callout>
 			</section>
 
+			<section id="mouse" class="scroll-mt-28 mb-16">
+				<h2 class="font-mono text-[20px] tracking-tight mb-1">Mouse Controls</h2>
+				<p class="text-[14px] text-[#5B5C52] mb-4">
+					Mouse input works directly in the text area, independent of the file explorer and tab bar
+					behavior described above.
+				</p>
+				<DocsTable
+					headers={['Action', 'Behavior']}
+					rows={[
+						['`Click`', 'Moves the text cursor to that position in the document.'],
+						['`Scroll wheel`', 'Scrolls the viewport up or down without moving the cursor.'],
+						['`Hover`', 'Shows type/definition info after a short pause, if an LSP is running.']
+					]}
+				/>
+				<Callout type="note">
+					If you scroll far enough that the cursor's line goes off-screen, the cursor snaps back to
+					the nearest visible line rather than staying hidden off-screen.
+				</Callout>
+			</section>
+
 			<section id="keybindings" class="scroll-mt-28 mb-16">
 				<h2 class="font-mono text-[20px] tracking-tight mb-1">Keybindings</h2>
 				<p class="text-[14px] text-[#5B5C52] mb-4">
@@ -196,51 +250,50 @@
 						['`Ctrl+Z`', 'Undo the last change.'],
 						['`Ctrl+Shift+Z`', 'Redo the last undone change.'],
 						['`↑ ↓ ← →`', 'Move the cursor.'],
+						['`Ctrl+← / Ctrl+→`', 'Jump the cursor a full word left or right.'],
 						['`Enter`', 'Insert a newline, splitting the current line.'],
 						['`Backspace`', 'Delete the character before the cursor.'],
-						['`Esc`', 'Cancel the filename popup (only active while it\'s open).']
+						['`Esc`', "Cancel the filename popup (only active while it's open)."]
 					]}
 				/>
 				<Callout type="tip">
-					<code>Ctrl+W</code> closes the current file tab. If you close the last tab,
-					Ziro drops back to a blank buffer instead of exiting.
+					<code>Ctrl+W</code> closes the current file tab. If you close the last tab, Ziro drops back
+					to a blank buffer instead of exiting.
 				</Callout>
 			</section>
 
 			<section id="undo-redo" class="scroll-mt-28 mb-16">
 				<h2 class="font-mono text-[20px] tracking-tight mb-1">Undo & Redo</h2>
 				<p class="text-[14px] text-[#5B5C52] mb-4">
-					Ziro snapshots the full buffer and cursor position before each edit,
-					not per-keystroke. Consecutive character insertions and consecutive
-					backspaces are grouped into a single undo step; typing a word and
-					then deleting it are still two separate steps.
+					Ziro snapshots the full buffer and cursor position before each edit, not per-keystroke.
+					Consecutive character insertions and consecutive backspaces are grouped into a single undo
+					step; typing a word and then deleting it are still two separate steps.
 				</p>
 				<DocsTable
 					headers={['Key', 'Action']}
 					rows={[
-						['`Ctrl+U`', 'Undo'],
-						['`Ctrl+R`', 'Redo']
+						['`Ctrl+Z`', 'Undo'],
+						['`Ctrl+Shift+Z`', 'Redo']
 					]}
 				/>
 				<Callout type="note">
-					Redo history is cleared as soon as you make a new edit after undoing —
-					same behavior you'd expect from any standard editor.
+					Redo history is cleared as soon as you make a new edit after undoing — same behavior you'd
+					expect from any standard editor.
 				</Callout>
 			</section>
 
 			<section id="syntax-highlighting" class="scroll-mt-28">
 				<h2 class="font-mono text-[20px] tracking-tight mb-1">Syntax Highlighting</h2>
 				<p class="text-[14px] text-[#5B5C52] mb-4">
-					Ziro detects the language from the file's extension and applies syntax
-					highlighting via <code class="font-mono text-[13px] bg-[#F5F4EE] px-1.5 py-0.5 rounded">syntect</code>,
-					using the Solarized (dark) theme. Supported languages include anything
-					syntect ships by default: Rust, Python, JavaScript, TypeScript, Go, C,
-					C++, HTML, CSS, JSON, TOML, Markdown, and more.
+					Ziro detects the language from the file's extension and applies syntax highlighting via <code
+						class="font-mono text-[13px] bg-[#F5F4EE] px-1.5 py-0.5 rounded">syntect</code
+					>, using the Ziro Dark theme. Supported languages include anything syntect ships by
+					default: Rust, Python, JavaScript, TypeScript, Go, C, C++, HTML, CSS, JSON, TOML,
+					Markdown, and more.
 				</p>
 				<Callout type="note">
-					If you open Ziro without a filename, there's no extension to detect —
-					highlighting falls back to plain text until you save the buffer with
-					a real name.
+					If you open Ziro without a filename, there's no extension to detect — highlighting falls
+					back to plain text until you save the buffer with a real name.
 				</Callout>
 			</section>
 		</div>
