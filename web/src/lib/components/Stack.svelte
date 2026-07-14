@@ -15,10 +15,11 @@
 		'Terminal interface',
 		'Editor UI',
 		'File open/save',
-		'Syntax highlighting'
+		'Syntax highlighting',
+		'LSP integration'
 	];
 
-	const pending = ['LSP integration', 'Config system', 'Plugin system'];
+	const pending = ['Config system', 'Plugin system'];
 </script>
 
 <section id="stack" class="px-6 py-24 border-t border-[#E5E3D8]" use:reveal>
@@ -50,7 +51,10 @@
 			<div class="space-y-2.5">
 				{#each done as item (item)}
 					<div class="flex items-center gap-3">
-						<span class="flex items-center justify-center w-4 h-4 rounded-[3px] bg-[#1F7A4C] text-[#FCFCFA] text-[10px] shrink-0">✓</span>
+						<span
+							class="flex items-center justify-center w-4 h-4 rounded-[3px] bg-[#1F7A4C] text-[#FCFCFA] text-[10px] shrink-0"
+							>✓</span
+						>
 						<span class="text-[14px] text-[#14140F]">{item}</span>
 					</div>
 				{/each}
