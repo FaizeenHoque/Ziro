@@ -21,13 +21,13 @@ impl Document {
             .map(|s| s.to_string())
             .collect::<Vec<String>>();
 
-        Ok(Self { 
+        Ok(Self {
             lines: if lines.is_empty() {
                 vec![String::new()]
             } else {
                 lines
             },
-         })
+        })
     }
 
     pub fn save(&self, path: &str) -> io::Result<()> {
@@ -36,25 +36,21 @@ impl Document {
         Ok(())
     }
 
-    pub fn insert_char(&mut self, x: usize, y: usize, c: char,) {
+    pub fn insert_char(&mut self, x: usize, y: usize, c: char) {
         self.lines[y].insert(x, c);
     }
 
-    pub fn split_line(&mut self, x: usize, y: usize,) {
+    pub fn split_line(&mut self, x: usize, y: usize) {
         let new_line = self.lines[y].split_off(x);
 
-        self.lines.insert(
-            y + 1,
-            new_line,
-        );
+        self.lines.insert(y + 1, new_line);
     }
 
-    pub fn remove_char(&mut self, x: usize, y: usize,) {
+    pub fn remove_char(&mut self, x: usize, y: usize) {
         self.lines[y].remove(x);
     }
 
-    pub fn backspace(&mut self, x: usize, y: usize,) -> (usize, usize) {
-
+    pub fn backspace(&mut self, x: usize, y: usize) -> (usize, usize) {
         if x > 0 {
             self.lines[y].remove(x - 1);
 
