@@ -107,10 +107,34 @@ impl App {
         let Some(item) = self.completions.get(self.completion_selected) else {
             return;
         };
+
         let mut text = item
             .insert_text
             .clone()
             .unwrap_or_else(|| item.label.clone());
+
+        if let Some(open) = text.find('(') {
+            let bytes = text.as_bytes();
+            let mut depth = 0i32;
+            let mut close = None;
+            for (i, &b) in bytes[open..].iter().enumerate() {
+                match b {
+                    b'(' => depth += 1,
+                    b')' => {
+                        depth -= 1;
+                        if depth == 0 {
+                            close = Some(open + i);
+                            break;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            if let Some(close) = close {
+                text.replace_range(open..=close, "()");
+            }
+        }
+
         let mut cursor = text.len();
         if matches!(item.kind, Some(2..=4)) {
             if !text.contains('(') {
@@ -118,9 +142,11 @@ impl App {
             }
             cursor = text.find('(').map_or(text.len(), |index| index + 1);
         }
+
         let start = self.document.lines[self.cursor.y][..self.cursor.x]
             .rfind(|c: char| !c.is_alphanumeric() && c != '_')
             .map_or(0, |index| index + 1);
+
         self.document.lines[self.cursor.y].replace_range(start..self.cursor.x, &text);
         self.cursor.x = start + cursor;
         self.completions.clear();
