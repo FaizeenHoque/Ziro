@@ -1,3 +1,5 @@
+use std::{path::Path, time::Duration};
+
 use ratatui::{
     style::{Color, Modifier, Style},
     text::{Line, Span},
@@ -8,6 +10,8 @@ use syntect::{
     parsing::SyntaxSet,
     util::LinesWithEndings,
 };
+
+use crate::{app::App, lsp::protocol::SemanticToken};
 
 // Embedded at COMPILE time, not read from disk at runtime.
 // This means the theme travels inside the binary — works on any machine
@@ -121,4 +125,44 @@ impl Highlighter {
 fn load_embedded_theme(bytes: &[u8]) -> Result<Theme, syntect::LoadingError> {
     let mut reader = std::io::Cursor::new(bytes);
     ThemeSet::load_from_reader(&mut reader)
+}
+
+impl App {
+    pub fn set_semantic_tokens(&mut self, legend: &[String], data: Vec<u32>) {
+        self.semantic_tokens.clear();
+        let (mut line, mut start) = (0usize, 0usize);
+        for chunk in data.chunks_exact(5) {
+            line += chunk[0] as usize;
+            start = if chunk[0] == 0 {
+                start + chunk[1] as usize
+            } else {
+                chunk[1] as usize
+            };
+            if let Some(token_type) = legend.get(chunk[3] as usize).cloned() {
+                self.semantic_tokens
+                    .entry(line)
+                    .or_default()
+                    .push(SemanticToken {
+                        start,
+                        length: chunk[2] as usize,
+                        token_type,
+                        modifiers: chunk[4],
+                    });
+            }
+        }
+    }
+
+    pub fn poll_semantic_tokens(&mut self) {
+        if self
+            .semantic_refresh
+            .is_none_or(|time| time.elapsed() < Duration::from_millis(250))
+        {
+            return;
+        }
+        self.semantic_refresh = None;
+        let path = Path::new(&self.current_file).to_path_buf();
+        if let Some(session) = self.current_session_mut() {
+            let _ = session.client.semantic_tokens(&path);
+        }
+    }
 }

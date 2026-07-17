@@ -1,3 +1,5 @@
+use crate::app::App;
+
 use super::{
     messages::LspMessage,
     protocol::{CompletionItem, Diagnostic, Hover, path_to_uri},
@@ -7,7 +9,7 @@ use serde_json::{Value, json};
 use std::{
     collections::HashMap,
     io::{BufRead, BufReader, Read, Write},
-    path::Path,
+    path::{Path, PathBuf},
     process::{ChildStdin, Command, Stdio},
     sync::{
         Arc, Mutex,
@@ -240,4 +242,78 @@ pub struct LspSession {
     pub client: LspClient,
     pub status: LspStatus,
     pub semantic_legend: Vec<String>,
+}
+
+impl App {
+    pub fn ensure_lsp_session(&mut self) {
+        let Some(language) = self.language_id() else {
+            return;
+        };
+        if self.lsp_sessions.contains_key(language) {
+            return;
+        }
+
+        let Some((binary, args)) = crate::lsp::registry::find_server(language) else {
+            return;
+        };
+
+        match LspClient::spawn(&binary, args, language) {
+            Ok(mut client) => {
+                let start = Path::new(&self.current_file)
+                    .parent()
+                    .map(Path::to_path_buf)
+                    .unwrap_or_else(|| {
+                        std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+                    });
+                let root = crate::lsp::registry::find_root(&start, language);
+                let _ = client.initialize(&root);
+                self.lsp_sessions.insert(
+                    language.to_string(),
+                    LspSession {
+                        client,
+                        status: LspStatus::Initializing,
+                        semantic_legend: Vec::new(),
+                    },
+                );
+            }
+            Err(_) => {
+                // Binary was found on PATH but failed to spawn (permissions,
+                // corrupt install, etc). No session inserted — same
+                // "none found" treatment rather than a half-broken entry.
+            }
+        }
+    }
+
+    pub fn current_session_mut(&mut self) -> Option<&mut LspSession> {
+        let language = self.language_id()?;
+        self.lsp_sessions.get_mut(language)
+    }
+
+    pub fn current_session(&self) -> Option<&LspSession> {
+        let language = self.language_id()?;
+        self.lsp_sessions.get(language)
+    }
+
+    pub fn lsp_status_text(&self) -> String {
+        match self.language_id() {
+            None => "n/a".to_string(),
+            Some(language) => match self.lsp_sessions.get(language) {
+                Some(session) => format!(
+                    "{language} {}",
+                    match session.status {
+                        LspStatus::Initializing => "initializing",
+                        LspStatus::Alive => "alive",
+                        LspStatus::Offline => "offline",
+                    }
+                ),
+                None => format!("{language}: none found"),
+            },
+        }
+    }
+
+    pub fn shutdown_lsp_sessions(&mut self) {
+        for session in self.lsp_sessions.values_mut() {
+            let _ = session.client.shutdown();
+        }
+    }
 }
