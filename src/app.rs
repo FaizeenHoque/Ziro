@@ -15,7 +15,6 @@ use crate::management::{TabItem, UndoState};
 use crate::ui::Theme;
 use crate::{editor::*, ui};
 
-#[derive(Debug)]
 pub struct App {
     pub document: Document,
     pub theme: Theme,
@@ -32,6 +31,8 @@ pub struct App {
     pub cursor: Cursor,
     pub highlighter: Highlighter,
     pub last_line_count: usize,
+
+    pub clipboard: Option<arboard::Clipboard>,
 
     pub undo_stack: Vec<UndoState>,
     pub redo_stack: Vec<UndoState>,
@@ -69,6 +70,19 @@ pub struct App {
     pub exit: bool,
 }
 
+impl std::fmt::Debug for App {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("App")
+            .field("document", &self.document)
+            .field("current_file", &self.current_file)
+            .field("cursor", &self.cursor)
+            .field("clipboard", &self.clipboard.is_some())
+            .field("undo_stack_len", &self.undo_stack.len())
+            .field("last_action", &self.last_action)
+            .finish_non_exhaustive()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ActionKind {
     None,
@@ -96,6 +110,8 @@ impl Default for App {
             hover_anchor: None,
             hover_pending: None,
             last_line_count,
+
+            clipboard: arboard::Clipboard::new().ok(),
 
             current_file: String::new(),
             highlighter: Highlighter::new(),

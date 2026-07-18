@@ -2,7 +2,6 @@ use crate::app::{ActionKind, App};
 use crossterm::event::{KeyCode, KeyModifiers};
 
 impl App {
-    // Top-level key dispatcher: autocomplete popup, then filename prompt, then normal editing.
     pub fn handle_key(&mut self, key: crossterm::event::KeyEvent) {
         if self.status {
             self.reset_status();
@@ -43,7 +42,7 @@ impl App {
             }
 
             KeyCode::Char('v') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                todo!("Implement Paste");
+                self.paste();
             }
 
             KeyCode::Char('x') if key.modifiers.contains(KeyModifiers::CONTROL) => {
@@ -227,7 +226,6 @@ impl App {
         self.update_scroll(self.viewport_height.get());
     }
 
-    // Handles all input while the filename (Save As) prompt is open.
     fn handle_filename_prompt_key(&mut self, key: crossterm::event::KeyEvent) {
         match key.code {
             KeyCode::Char(c)
@@ -272,7 +270,6 @@ impl App {
         }
     }
 
-    // Deletes back to the start of the previous word (Ctrl+Backspace / Ctrl+H).
     fn delete_word_before_cursor(&mut self) {
         if self.last_action != ActionKind::Delete {
             self.push_undo();
@@ -310,7 +307,6 @@ impl App {
 }
 
 impl App {
-    // Returns the byte index of the start of the word before `idx` on `line`.
     fn word_left(line: &str, idx: usize) -> usize {
         let head = &line[..idx];
         let mut offset = 0usize;
@@ -341,7 +337,6 @@ impl App {
         idx - offset
     }
 
-    // Returns the byte index of the end of the word after `idx` on `line`.
     fn word_right(line: &str, idx: usize) -> usize {
         let rest = &line[idx..];
         let mut offset = 0usize;
@@ -372,10 +367,42 @@ impl App {
         idx + offset
     }
 
-    // Clears any pending hover/tooltip state, e.g. before moving the cursor.
     fn clear_hover(&mut self) {
         self.hover = None;
         self.hover_pending = None;
         self.hover_position = None;
+    }
+
+    fn paste(&mut self) {
+        let mut clipboard = match arboard::Clipboard::new() {
+            Ok(c) => c,
+            Err(_) => {
+                self.show_status("clipboard unavailable".to_string());
+                return;
+            }
+        };
+
+        let text = match clipboard.get_text() {
+            Ok(t) => t,
+            Err(e) => {
+                self.show_status(format!("clipboard error: {e}"));
+                return;
+            }
+        };
+
+        if text.is_empty() {
+            return;
+        }
+
+        self.push_undo();
+
+        let (new_x, new_y) = self
+            .document
+            .insert_str(self.cursor.x, self.cursor.y, &text);
+        self.cursor.x = new_x;
+        self.cursor.y = new_y;
+
+        self.document_changed(true);
+        self.last_action = ActionKind::Insert;
     }
 }

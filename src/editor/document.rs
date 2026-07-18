@@ -40,6 +40,34 @@ impl Document {
         self.lines[y].insert(x, c);
     }
 
+    pub fn insert_str(&mut self, x: usize, y: usize, text: &str) -> (usize, usize) {
+        let normalized = text.replace("\r\n", "\n");
+        let parts: Vec<&str> = normalized.split('\n').collect();
+
+        if parts.len() == 1 {
+            self.lines[y].insert_str(x, parts[0]);
+            return (x + parts[0].len(), y);
+        }
+
+        let line = &self.lines[y];
+        let before = line[..x].to_string();
+        let after = line[x..].to_string();
+
+        self.lines[y] = format!("{}{}", before, parts[0]);
+
+        let mut insert_at = y + 1;
+        for part in &parts[1..parts.len() - 1] {
+            self.lines.insert(insert_at, part.to_string());
+            insert_at += 1;
+        }
+
+        let last_part = parts[parts.len() - 1];
+        let final_line = format!("{}{}", last_part, after);
+        self.lines.insert(insert_at, final_line);
+
+        (last_part.len(), insert_at)
+    }
+
     pub fn split_line(&mut self, x: usize, y: usize) {
         let new_line = self.lines[y].split_off(x);
 
