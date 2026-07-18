@@ -1,8 +1,10 @@
 // src/management/mod.rs
-mod input_management;
-mod tab_management;
 mod history_management;
+mod input_management;
+mod selection_management;
+mod tab_management;
 
-pub use input_management::*;
-pub use tab_management::*;
 pub use history_management::*;
+pub use input_management::*;
+pub use selection_management::*;
+pub use tab_management::*;

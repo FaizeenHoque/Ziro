@@ -1,4 +1,3 @@
-// main.rs
 mod app;
 mod debug;
 mod editor;

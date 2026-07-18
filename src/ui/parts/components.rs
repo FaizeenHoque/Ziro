@@ -149,7 +149,32 @@ impl App {
             .into_iter()
             .skip(self.scroll_y)
             .take(viewport_height)
-            .map(|line| Line::from(line.spans))
+            .enumerate()
+            .map(|(i, line)| {
+                let line_no = self.scroll_y + i;
+                let spans = if let Some(selection) = &self.selection {
+                    let (start, end) = selection.range((self.cursor.x, self.cursor.y));
+                    if line_no >= start.1 && line_no <= end.1 {
+                        let sel_start = if line_no == start.1 { start.0 } else { 0 };
+                        let sel_end = if line_no == end.1 {
+                            end.0
+                        } else {
+                            self.document.lines[line_no].chars().count()
+                        };
+                        Self::apply_selection_highlight(
+                            line.spans,
+                            sel_start,
+                            sel_end,
+                            self.theme.selected_bg,
+                        )
+                    } else {
+                        line.spans
+                    }
+                } else {
+                    line.spans
+                };
+                Line::from(spans)
+            })
             .collect();
 
         Paragraph::new(content_lines)
@@ -162,5 +187,54 @@ impl App {
 
         // Call LSP layers to draw on top of content bounds
         render_language_overlays(self, horizontal[1], buf);
+    }
+
+    pub fn apply_selection_highlight<'a>(
+        spans: Vec<Span<'a>>,
+        sel_start: usize,
+        sel_end: usize,
+        selection_bg: Color,
+    ) -> Vec<Span<'a>> {
+        if sel_start >= sel_end {
+            return spans;
+        }
+
+        let mut result = Vec::new();
+        let mut col = 0usize;
+
+        for span in spans {
+            let text = span.content.to_string();
+            let len = text.chars().count();
+            let span_start = col;
+            let span_end = col + len;
+            col = span_end;
+
+            // No overlap with selection — keep span as-is.
+            if span_end <= sel_start || span_start >= sel_end {
+                result.push(Span::styled(text, span.style));
+                continue;
+            }
+
+            // Overlap exists — split into up to three parts: before, selected, after.
+            let local_sel_start = sel_start.saturating_sub(span_start).min(len);
+            let local_sel_end = sel_end.saturating_sub(span_start).min(len);
+
+            let chars: Vec<char> = text.chars().collect();
+            let before: String = chars[..local_sel_start].iter().collect();
+            let selected: String = chars[local_sel_start..local_sel_end].iter().collect();
+            let after: String = chars[local_sel_end..].iter().collect();
+
+            if !before.is_empty() {
+                result.push(Span::styled(before, span.style));
+            }
+            if !selected.is_empty() {
+                result.push(Span::styled(selected, span.style.bg(selection_bg)));
+            }
+            if !after.is_empty() {
+                result.push(Span::styled(after, span.style));
+            }
+        }
+
+        result
     }
 }

@@ -11,7 +11,7 @@ use ratatui::{DefaultTerminal, Frame};
 
 use crate::lsp::protocol::{CompletionItem, Diagnostic, Hover, SemanticToken};
 use crate::lsp::{LspSession, LspStatus};
-use crate::management::{TabItem, UndoState};
+use crate::management::{Selection, TabItem, UndoState};
 use crate::ui::Theme;
 use crate::{editor::*, ui};
 
@@ -33,6 +33,7 @@ pub struct App {
     pub last_line_count: usize,
 
     pub clipboard: Option<arboard::Clipboard>,
+    pub selection: Option<Selection>,
 
     pub undo_stack: Vec<UndoState>,
     pub redo_stack: Vec<UndoState>,
@@ -112,6 +113,7 @@ impl Default for App {
             last_line_count,
 
             clipboard: arboard::Clipboard::new().ok(),
+            selection: None,
 
             current_file: String::new(),
             highlighter: Highlighter::new(),

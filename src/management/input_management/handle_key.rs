@@ -1,4 +1,7 @@
-use crate::app::{ActionKind, App};
+use crate::{
+    app::{ActionKind, App},
+    management::Selection,
+};
 use crossterm::event::{KeyCode, KeyModifiers};
 
 impl App {
@@ -161,15 +164,24 @@ impl App {
                 self.document_changed(false);
                 self.last_action = ActionKind::Delete;
             }
-
             KeyCode::Up => {
                 self.clear_hover();
+                if key.modifiers.contains(KeyModifiers::SHIFT) {
+                    self.start_selection_if_none();
+                } else {
+                    self.selection = None;
+                }
                 self.cursor.y = self.cursor.y.saturating_sub(1);
                 self.cursor.x = self.cursor.x.min(self.document.lines[self.cursor.y].len());
                 self.last_action = ActionKind::None;
             }
             KeyCode::Down => {
                 self.clear_hover();
+                if key.modifiers.contains(KeyModifiers::SHIFT) {
+                    self.start_selection_if_none();
+                } else {
+                    self.selection = None;
+                }
                 if self.cursor.y + 1 < self.document.lines.len() {
                     self.cursor.y += 1;
                     self.cursor.x = self.cursor.x.min(self.document.lines[self.cursor.y].len());
@@ -178,6 +190,11 @@ impl App {
             }
             KeyCode::Left => {
                 self.clear_hover();
+                if key.modifiers.contains(KeyModifiers::SHIFT) {
+                    self.start_selection_if_none();
+                } else {
+                    self.selection = None;
+                }
                 if key.modifiers.contains(KeyModifiers::CONTROL) {
                     if self.cursor.x == 0 {
                         if self.cursor.y > 0 {
@@ -200,6 +217,11 @@ impl App {
             }
             KeyCode::Right => {
                 self.clear_hover();
+                if key.modifiers.contains(KeyModifiers::SHIFT) {
+                    self.start_selection_if_none();
+                } else {
+                    self.selection = None;
+                }
                 let line_length = self.document.lines[self.cursor.y].len();
                 if key.modifiers.contains(KeyModifiers::CONTROL) {
                     if self.cursor.x >= line_length {
@@ -219,7 +241,6 @@ impl App {
                 }
                 self.last_action = ActionKind::None;
             }
-
             _ => {}
         }
 
@@ -404,5 +425,13 @@ impl App {
 
         self.document_changed(true);
         self.last_action = ActionKind::Insert;
+    }
+
+    fn start_selection_if_none(&mut self) {
+        if self.selection.is_none() {
+            self.selection = Some(Selection {
+                anchor: (self.cursor.x, self.cursor.y),
+            });
+        }
     }
 }
