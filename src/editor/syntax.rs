@@ -13,10 +13,6 @@ use syntect::{
 
 use crate::{app::App, lsp::protocol::SemanticToken};
 
-// Embedded at COMPILE time, not read from disk at runtime.
-// This means the theme travels inside the binary — works on any machine
-// you ship this to, and can never fail from a missing/wrong path.
-// Put the actual file at: assets/ZiroDark.tmTheme (relative to this source file's crate root)
 const ZIRO_DARK_THEME_BYTES: &[u8] = include_bytes!("../../assets/ZiroDark.tmTheme");
 
 pub struct Highlighter {

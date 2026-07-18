@@ -9,7 +9,11 @@ pub struct UndoState {
 
 impl App {
     fn snapshot(&self) -> UndoState {
-        UndoState { lines: self.document.lines.clone(), cursor_x: self.cursor.x, cursor_y: self.cursor.y }
+        UndoState {
+            lines: self.document.lines.clone(),
+            cursor_x: self.cursor.x,
+            cursor_y: self.cursor.y,
+        }
     }
 
     pub fn push_undo(&mut self) {
@@ -42,5 +46,4 @@ impl App {
             None => self.show_status("nothing to redo".to_string()),
         }
     }
-
 }

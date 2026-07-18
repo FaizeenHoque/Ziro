@@ -31,42 +31,32 @@ pub struct App {
     pub cursor: Cursor,
     pub highlighter: Highlighter,
     pub last_line_count: usize,
-
     pub clipboard: Option<arboard::Clipboard>,
     pub selection: Option<Selection>,
-
     pub undo_stack: Vec<UndoState>,
     pub redo_stack: Vec<UndoState>,
     pub last_action: ActionKind,
     pub last_saved: Vec<String>,
-
     pub scroll_y: usize,
     pub viewport_height: Cell<usize>,
     pub number_col_width: u16,
     pub editor_area: Cell<Rect>,
-
     pub current_file: String,
     pub filename_input: String,
-
     pub status_text: String,
     pub status: bool,
     pub filename_prompt: bool,
     pub show_explorer: bool,
-
     pub explorer_area: Cell<Rect>,
     pub explorer_entries: Vec<FileEntry>,
     pub explorer_selected: usize,
     pub explorer_cwd: PathBuf,
-
     pub tabs_area: Cell<Rect>,
     pub tabs_list: Vec<TabItem>,
-
     pub dragging_tab: Option<usize>,
     pub tab_drag_target: Option<usize>,
-
     pub dragging_entry: Option<usize>,
     pub entry_drag_target: Option<usize>,
-
     pub pending_quit_after_save: bool,
     pub exit: bool,
 }

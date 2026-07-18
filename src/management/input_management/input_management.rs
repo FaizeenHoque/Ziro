@@ -85,8 +85,6 @@ impl App {
         Ok(())
     }
 
-    /// Polls for a single terminal event within `timeout` and dispatches it.
-    /// Returns Ok(true) if an event was found and handled.
     fn poll_and_dispatch(&mut self, timeout: Duration) -> io::Result<bool> {
         if event::poll(timeout)? {
             match event::read()? {
