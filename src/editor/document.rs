@@ -97,4 +97,45 @@ impl Document {
 
         (x, y)
     }
+
+    pub fn extract_range(&self, start: (usize, usize), end: (usize, usize)) -> String {
+        let (sx, sy) = start;
+        let (ex, ey) = end;
+
+        if sy == ey {
+            return self.lines[sy][sx..ex].to_string();
+        }
+
+        let mut result = String::new();
+        result.push_str(&self.lines[sy][sx..]);
+        result.push('\n');
+
+        for line in &self.lines[sy + 1..ey] {
+            result.push_str(line);
+            result.push('\n');
+        }
+
+        result.push_str(&self.lines[ey][..ex]);
+        result
+    }
+
+    pub fn delete_range(&mut self, start: (usize, usize), end: (usize, usize)) -> (usize, usize) {
+        let (sx, sy) = start;
+        let (ex, ey) = end;
+
+        if sy == ey {
+            self.lines[sy].replace_range(sx..ex, "");
+            return (sx, sy);
+        }
+
+        let tail = self.lines[ey][ex..].to_string();
+        let head = self.lines[sy][..sx].to_string();
+
+        // Remove the fully-enclosed middle lines and the end line,
+        // then splice head+tail into the start line.
+        self.lines.drain(sy + 1..=ey);
+        self.lines[sy] = format!("{}{}", head, tail);
+
+        (sx, sy)
+    }
 }

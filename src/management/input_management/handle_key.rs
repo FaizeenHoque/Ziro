@@ -41,7 +41,7 @@ impl App {
 
         match key.code {
             KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                todo!("Implement Copy");
+                self.copy();
             }
 
             KeyCode::Char('v') if key.modifiers.contains(KeyModifiers::CONTROL) => {
@@ -49,7 +49,7 @@ impl App {
             }
 
             KeyCode::Char('x') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                todo!("Implement Cut");
+                self.cut();
             }
 
             KeyCode::Char('e') if key.modifiers.contains(KeyModifiers::CONTROL) => {
@@ -392,6 +392,65 @@ impl App {
         self.hover = None;
         self.hover_pending = None;
         self.hover_position = None;
+    }
+
+    fn cut(&mut self) {
+        let Some(selection) = self.selection else {
+            return;
+        };
+        let (start, end) = selection.range((self.cursor.x, self.cursor.y));
+
+        if start == end {
+            return;
+        }
+
+        let text = self.document.extract_range(start, end);
+
+        let mut clipboard = match arboard::Clipboard::new() {
+            Ok(c) => c,
+            Err(_) => {
+                self.show_status("clipboard unavailable".to_string());
+                return;
+            }
+        };
+
+        if clipboard.set_text(text).is_err() {
+            self.show_status("failed to cut".to_string());
+            return;
+        }
+
+        self.push_undo();
+        let (new_x, new_y) = self.document.delete_range(start, end);
+        self.cursor.x = new_x;
+        self.cursor.y = new_y;
+        self.selection = None;
+        self.document_changed(false);
+        self.last_action = ActionKind::Delete;
+    }
+
+    fn copy(&mut self) {
+        let Some(selection) = &self.selection else {
+            return;
+        };
+        let (start, end) = selection.range((self.cursor.x, self.cursor.y));
+
+        if start == end {
+            return;
+        }
+
+        let text = self.document.extract_range(start, end);
+
+        let mut clipboard = match arboard::Clipboard::new() {
+            Ok(c) => c,
+            Err(_) => {
+                self.show_status("clipboard unavailable".to_string());
+                return;
+            }
+        };
+
+        if clipboard.set_text(text).is_err() {
+            self.show_status("failed to copy".to_string());
+        }
     }
 
     fn paste(&mut self) {
