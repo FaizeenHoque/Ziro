@@ -1,4 +1,7 @@
-use crate::app::{ActionKind, App};
+use crate::{
+    app::{ActionKind, App},
+    management::Selection,
+};
 use crossterm::event::{KeyCode, KeyModifiers};
 
 impl App {
@@ -6,6 +9,7 @@ impl App {
         if self.status {
             self.reset_status();
         }
+
         if !self.completions.is_empty() {
             match key.code {
                 KeyCode::Esc => {
@@ -29,86 +33,32 @@ impl App {
             }
         }
 
+        if self.filename_prompt {
+            self.handle_filename_prompt_key(key);
+            self.update_scroll(self.viewport_height.get());
+            return;
+        }
+
         match key.code {
-            KeyCode::Backspace | KeyCode::Char('h')
-                if self.filename_prompt != true
-                    && key
-                        .modifiers
-                        .contains(crossterm::event::KeyModifiers::CONTROL) =>
-            {
-                if self.last_action != ActionKind::Delete {
-                    self.push_undo();
-                }
-
-                while self.cursor.x > 0 {
-                    let ch = self.document.lines[self.cursor.y]
-                        .chars()
-                        .nth(self.cursor.x - 1)
-                        .unwrap();
-
-                    if !ch.is_whitespace() {
-                        break;
-                    }
-
-                    let (x, y) = self.document.backspace(self.cursor.x, self.cursor.y);
-                    self.cursor.x = x;
-                    self.cursor.y = y;
-                }
-
-                while self.cursor.x > 0 {
-                    let ch = self.document.lines[self.cursor.y]
-                        .chars()
-                        .nth(self.cursor.x - 1)
-                        .unwrap();
-
-                    if ch.is_whitespace() {
-                        break;
-                    }
-
-                    let (x, y) = self.document.backspace(self.cursor.x, self.cursor.y);
-                    self.cursor.x = x;
-                    self.cursor.y = y;
-                }
-
-                if self.cursor.x == 0 && self.cursor.y > 0 {
-                    let (x, y) = self.document.backspace(self.cursor.x, self.cursor.y);
-                    self.cursor.x = x;
-                    self.cursor.y = y;
-                }
-
-                self.document_changed(false);
-                self.last_action = ActionKind::Delete;
-            }
-            KeyCode::Char(c)
-                if self.filename_prompt == true
-                    && !key
-                        .modifiers
-                        .contains(crossterm::event::KeyModifiers::CONTROL)
-                    && !key.modifiers.contains(crossterm::event::KeyModifiers::ALT) =>
-            {
-                self.filename_input.push(c);
+            KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.copy();
             }
 
-            KeyCode::Esc if self.filename_prompt == true => {
-                self.filename_input.clear();
-                self.pending_quit_after_save = false;
-                self.filename_prompt = false;
-                self.show_status("canceled file write".to_string());
+            KeyCode::Char('v') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.paste();
             }
 
-            KeyCode::Char('e')
-                if key
-                    .modifiers
-                    .contains(crossterm::event::KeyModifiers::CONTROL) =>
-            {
+            KeyCode::Char('x') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                self.cut();
+            }
+
+            KeyCode::Char('e') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.toggle_explorer();
             }
 
             KeyCode::Char('w')
-                if key
-                    .modifiers
-                    .contains(crossterm::event::KeyModifiers::CONTROL)
-                    && key.modifiers.contains(crossterm::event::KeyModifiers::ALT) =>
+                if key.modifiers.contains(KeyModifiers::CONTROL)
+                    && key.modifiers.contains(KeyModifiers::ALT) =>
             {
                 if self.is_dirty() {
                     self.show_status("file is unsaved".to_string());
@@ -117,21 +67,11 @@ impl App {
                 }
             }
 
-            KeyCode::Char('w')
-                if self.filename_prompt != true
-                    && key
-                        .modifiers
-                        .contains(crossterm::event::KeyModifiers::CONTROL) =>
-            {
+            KeyCode::Char('w') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.close_current_tab();
             }
 
-            KeyCode::Char('s')
-                if self.filename_prompt != true
-                    && key
-                        .modifiers
-                        .contains(crossterm::event::KeyModifiers::CONTROL) =>
-            {
+            KeyCode::Char('s') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.pending_quit_after_save = false;
 
                 if !self.current_file.is_empty() {
@@ -148,50 +88,20 @@ impl App {
             }
 
             KeyCode::Char('z')
-                if self.filename_prompt != true
-                    && key
-                        .modifiers
-                        .contains(crossterm::event::KeyModifiers::CONTROL)
-                    && key
-                        .modifiers
-                        .contains(crossterm::event::KeyModifiers::SHIFT) =>
+                if key.modifiers.contains(KeyModifiers::CONTROL)
+                    && key.modifiers.contains(KeyModifiers::SHIFT) =>
             {
                 self.redo();
             }
 
-            KeyCode::Char('z')
-                if self.filename_prompt != true
-                    && key
-                        .modifiers
-                        .contains(crossterm::event::KeyModifiers::CONTROL) =>
-            {
+            KeyCode::Char('z') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.undo();
             }
 
-            KeyCode::Char(c) if self.filename_prompt == true => {
-                self.filename_input.push(c);
-            }
-            KeyCode::Backspace if self.filename_prompt == true => {
-                self.filename_input.pop();
-            }
-            KeyCode::Enter if self.filename_prompt == true => {
-                if !self.filename_input.is_empty() {
-                    self.current_file = self.filename_input.clone();
-                    match self.document.save(&self.current_file) {
-                        Ok(()) => {
-                            self.last_saved = self.document.lines.clone();
-                            if self.pending_quit_after_save {
-                                self.exit = true;
-                            }
-                        }
-                        Err(_) => {
-                            self.show_status("failed to save".to_string());
-                        }
-                    }
-                }
-                self.filename_input.clear();
-                self.pending_quit_after_save = false;
-                self.filename_prompt = false;
+            KeyCode::Backspace | KeyCode::Char('h')
+                if key.modifiers.contains(KeyModifiers::CONTROL) =>
+            {
+                self.delete_word_before_cursor();
             }
 
             KeyCode::Char(c) => {
@@ -209,32 +119,32 @@ impl App {
 
                 self.document.insert_char(self.cursor.x, self.cursor.y, c);
                 self.cursor.x += 1;
-                if c == '(' {
-                    self.document.insert_char(self.cursor.x, self.cursor.y, ')');
-                } else if c == '{' {
-                    self.document.insert_char(self.cursor.x, self.cursor.y, '}');
-                } else if c == '[' {
-                    self.document.insert_char(self.cursor.x, self.cursor.y, ']');
-                } else if c == '"' {
-                    self.document.insert_char(self.cursor.x, self.cursor.y, '"');
-                } else if c == '`' {
-                    self.document.insert_char(self.cursor.x, self.cursor.y, '`');
-                } else if c == '\'' {
+
+                let closing = match c {
+                    '(' => Some(')'),
+                    '{' => Some('}'),
+                    '[' => Some(']'),
+                    '"' => Some('"'),
+                    '`' => Some('`'),
+                    '\'' => Some('\''),
+                    _ => None,
+                };
+                if let Some(close_ch) = closing {
                     self.document
-                        .insert_char(self.cursor.x, self.cursor.y, '\'');
+                        .insert_char(self.cursor.x, self.cursor.y, close_ch);
                 }
 
                 self.document_changed(!c.is_whitespace());
-
                 self.last_action = ActionKind::Insert;
             }
+
             KeyCode::Tab => {
-                self.document.insert_char(self.cursor.x, self.cursor.y, ' ');
-                self.document.insert_char(self.cursor.x, self.cursor.y, ' ');
-                self.document.insert_char(self.cursor.x, self.cursor.y, ' ');
-                self.document.insert_char(self.cursor.x, self.cursor.y, ' ');
+                for _ in 0..4 {
+                    self.document.insert_char(self.cursor.x, self.cursor.y, ' ');
+                }
                 self.cursor.x += 4;
             }
+
             KeyCode::Enter => {
                 self.push_undo();
                 self.document.split_line(self.cursor.x, self.cursor.y);
@@ -243,49 +153,7 @@ impl App {
                 self.document_changed(false);
                 self.last_action = ActionKind::Newline;
             }
-            KeyCode::Backspace
-                if self.filename_prompt != true
-                    && key
-                        .modifiers
-                        .contains(crossterm::event::KeyModifiers::CONTROL) =>
-            {
-                if self.last_action != ActionKind::Delete {
-                    self.push_undo();
-                }
 
-                while self.cursor.x > 0 {
-                    let ch = self.document.lines[self.cursor.y]
-                        .chars()
-                        .nth(self.cursor.x - 1)
-                        .unwrap();
-
-                    if !ch.is_whitespace() {
-                        break;
-                    }
-
-                    let (x, y) = self.document.backspace(self.cursor.x, self.cursor.y);
-                    self.cursor.x = x;
-                    self.cursor.y = y;
-                }
-
-                while self.cursor.x > 0 {
-                    let ch = self.document.lines[self.cursor.y]
-                        .chars()
-                        .nth(self.cursor.x - 1)
-                        .unwrap();
-
-                    if ch.is_whitespace() {
-                        break;
-                    }
-
-                    let (x, y) = self.document.backspace(self.cursor.x, self.cursor.y);
-                    self.cursor.x = x;
-                    self.cursor.y = y;
-                }
-
-                self.document_changed(false);
-                self.last_action = ActionKind::Delete;
-            }
             KeyCode::Backspace => {
                 if self.last_action != ActionKind::Delete {
                     self.push_undo();
@@ -298,12 +166,22 @@ impl App {
             }
             KeyCode::Up => {
                 self.clear_hover();
+                if key.modifiers.contains(KeyModifiers::SHIFT) {
+                    self.start_selection_if_none();
+                } else {
+                    self.selection = None;
+                }
                 self.cursor.y = self.cursor.y.saturating_sub(1);
                 self.cursor.x = self.cursor.x.min(self.document.lines[self.cursor.y].len());
                 self.last_action = ActionKind::None;
             }
             KeyCode::Down => {
                 self.clear_hover();
+                if key.modifiers.contains(KeyModifiers::SHIFT) {
+                    self.start_selection_if_none();
+                } else {
+                    self.selection = None;
+                }
                 if self.cursor.y + 1 < self.document.lines.len() {
                     self.cursor.y += 1;
                     self.cursor.x = self.cursor.x.min(self.document.lines[self.cursor.y].len());
@@ -312,6 +190,11 @@ impl App {
             }
             KeyCode::Left => {
                 self.clear_hover();
+                if key.modifiers.contains(KeyModifiers::SHIFT) {
+                    self.start_selection_if_none();
+                } else {
+                    self.selection = None;
+                }
                 if key.modifiers.contains(KeyModifiers::CONTROL) {
                     if self.cursor.x == 0 {
                         if self.cursor.y > 0 {
@@ -334,6 +217,11 @@ impl App {
             }
             KeyCode::Right => {
                 self.clear_hover();
+                if key.modifiers.contains(KeyModifiers::SHIFT) {
+                    self.start_selection_if_none();
+                } else {
+                    self.selection = None;
+                }
                 let line_length = self.document.lines[self.cursor.y].len();
                 if key.modifiers.contains(KeyModifiers::CONTROL) {
                     if self.cursor.x >= line_length {
@@ -353,11 +241,89 @@ impl App {
                 }
                 self.last_action = ActionKind::None;
             }
-
             _ => {}
         }
 
         self.update_scroll(self.viewport_height.get());
+    }
+
+    fn handle_filename_prompt_key(&mut self, key: crossterm::event::KeyEvent) {
+        match key.code {
+            KeyCode::Char(c)
+                if !key.modifiers.contains(KeyModifiers::CONTROL)
+                    && !key.modifiers.contains(KeyModifiers::ALT) =>
+            {
+                self.filename_input.push(c);
+            }
+
+            KeyCode::Backspace => {
+                self.filename_input.pop();
+            }
+
+            KeyCode::Esc => {
+                self.filename_input.clear();
+                self.pending_quit_after_save = false;
+                self.filename_prompt = false;
+                self.show_status("canceled file write".to_string());
+            }
+
+            KeyCode::Enter => {
+                if !self.filename_input.is_empty() {
+                    self.current_file = self.filename_input.clone();
+                    match self.document.save(&self.current_file) {
+                        Ok(()) => {
+                            self.last_saved = self.document.lines.clone();
+                            if self.pending_quit_after_save {
+                                self.exit = true;
+                            }
+                        }
+                        Err(_) => {
+                            self.show_status("failed to save".to_string());
+                        }
+                    }
+                }
+                self.filename_input.clear();
+                self.pending_quit_after_save = false;
+                self.filename_prompt = false;
+            }
+
+            _ => {}
+        }
+    }
+
+    fn delete_word_before_cursor(&mut self) {
+        if self.last_action != ActionKind::Delete {
+            self.push_undo();
+        }
+
+        while self.cursor.x > 0 {
+            let ch = self.document.lines[self.cursor.y]
+                .chars()
+                .nth(self.cursor.x - 1)
+                .unwrap();
+            if !ch.is_whitespace() {
+                break;
+            }
+            let (x, y) = self.document.backspace(self.cursor.x, self.cursor.y);
+            self.cursor.x = x;
+            self.cursor.y = y;
+        }
+
+        while self.cursor.x > 0 {
+            let ch = self.document.lines[self.cursor.y]
+                .chars()
+                .nth(self.cursor.x - 1)
+                .unwrap();
+            if ch.is_whitespace() {
+                break;
+            }
+            let (x, y) = self.document.backspace(self.cursor.x, self.cursor.y);
+            self.cursor.x = x;
+            self.cursor.y = y;
+        }
+
+        self.document_changed(false);
+        self.last_action = ActionKind::Delete;
     }
 }
 
@@ -426,5 +392,105 @@ impl App {
         self.hover = None;
         self.hover_pending = None;
         self.hover_position = None;
+    }
+
+    fn cut(&mut self) {
+        let Some(selection) = self.selection else {
+            return;
+        };
+        let (start, end) = selection.range((self.cursor.x, self.cursor.y));
+
+        if start == end {
+            return;
+        }
+
+        let text = self.document.extract_range(start, end);
+
+        let mut clipboard = match arboard::Clipboard::new() {
+            Ok(c) => c,
+            Err(_) => {
+                self.show_status("clipboard unavailable".to_string());
+                return;
+            }
+        };
+
+        if clipboard.set_text(text).is_err() {
+            self.show_status("failed to cut".to_string());
+            return;
+        }
+
+        self.push_undo();
+        let (new_x, new_y) = self.document.delete_range(start, end);
+        self.cursor.x = new_x;
+        self.cursor.y = new_y;
+        self.selection = None;
+        self.document_changed(false);
+        self.last_action = ActionKind::Delete;
+    }
+
+    fn copy(&mut self) {
+        let Some(selection) = &self.selection else {
+            return;
+        };
+        let (start, end) = selection.range((self.cursor.x, self.cursor.y));
+
+        if start == end {
+            return;
+        }
+
+        let text = self.document.extract_range(start, end);
+
+        let mut clipboard = match arboard::Clipboard::new() {
+            Ok(c) => c,
+            Err(_) => {
+                self.show_status("clipboard unavailable".to_string());
+                return;
+            }
+        };
+
+        if clipboard.set_text(text).is_err() {
+            self.show_status("failed to copy".to_string());
+        }
+    }
+
+    fn paste(&mut self) {
+        let mut clipboard = match arboard::Clipboard::new() {
+            Ok(c) => c,
+            Err(_) => {
+                self.show_status("clipboard unavailable".to_string());
+                return;
+            }
+        };
+
+        let text = match clipboard.get_text() {
+            Ok(t) => t,
+            Err(e) => {
+                self.show_status(format!("clipboard error: {e}"));
+                return;
+            }
+        };
+
+        if text.is_empty() {
+            return;
+        }
+
+        self.push_undo();
+
+        let (new_x, new_y) = self
+            .document
+            .insert_str(self.cursor.x, self.cursor.y, &text);
+        self.cursor.x = new_x;
+        self.cursor.y = new_y;
+
+        self.document_changed(true);
+        self.last_action = ActionKind::Insert;
+    }
+
+    fn start_selection_if_none(&mut self) {
+        if self.selection.is_none() {
+            self.selection = Some(Selection {
+                anchor: (self.cursor.x, self.cursor.y),
+            });
+        }
     }
 }

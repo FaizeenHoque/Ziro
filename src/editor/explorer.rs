@@ -14,6 +14,22 @@ pub struct FileEntry {
 }
 
 impl App {
+    pub fn refresh_explorer(&mut self) {
+        self.explorer_entries = Self::read_dir_sorted(&self.explorer_cwd, 0);
+        self.explorer_selected = 0;
+    }
+
+    pub fn toggle_explorer(&mut self) {
+        if self.show_explorer == false {
+            self.show_explorer = true;
+            self.refresh_explorer();
+            self.show_status("Opened Explorer".to_string());
+        } else {
+            self.show_explorer = false;
+            self.show_status("Closed Explorer".to_string());
+        }
+    }
+
     pub fn start_entry_drag(&mut self, mouse: MouseEvent) {
         let area = self.explorer_area.get();
         if mouse.row < area.y {
@@ -52,6 +68,52 @@ impl App {
                 self.open_selected_entry();
             }
         }
+    }
+
+    pub fn open_selected_entry(&mut self) {
+        let entry = match self.explorer_entries.get(self.explorer_selected).cloned() {
+            Some(e) => e,
+            None => return,
+        };
+
+        if entry.is_dir {
+            if entry.expanded {
+                self.collapse_entry(self.explorer_selected);
+            } else {
+                self.expand_entry(self.explorer_selected);
+            }
+        } else {
+            self.push_file_to_tabs(&entry.path);
+        }
+    }
+
+    fn expand_entry(&mut self, index: usize) {
+        let (path, depth) = {
+            let entry = &self.explorer_entries[index];
+            (entry.path.clone(), entry.depth)
+        };
+
+        let children = Self::read_dir_sorted(&path, depth + 1);
+
+        self.explorer_entries[index].expanded = true;
+        self.explorer_entries.splice(index + 1..index + 1, children);
+    }
+
+    fn collapse_entry(&mut self, index: usize) {
+        let depth = self.explorer_entries[index].depth;
+
+        let end = self.explorer_entries[index + 1..]
+            .iter()
+            .position(|e| e.depth <= depth)
+            .map(|offset| index + 1 + offset)
+            .unwrap_or(self.explorer_entries.len());
+
+        self.explorer_entries.drain(index + 1..end);
+        self.explorer_entries[index].expanded = false;
+
+        self.explorer_selected = self
+            .explorer_selected
+            .min(self.explorer_entries.len().saturating_sub(1));
     }
 
     fn move_entry(&mut self, source_index: usize, target_index: usize) {
@@ -102,57 +164,6 @@ impl App {
         }
     }
 
-    pub fn refresh_explorer(&mut self) {
-        self.explorer_entries = Self::read_dir_sorted(&self.explorer_cwd, 0);
-        self.explorer_selected = 0;
-    }
-
-    pub fn open_selected_entry(&mut self) {
-        let entry = match self.explorer_entries.get(self.explorer_selected).cloned() {
-            Some(e) => e,
-            None => return,
-        };
-
-        if entry.is_dir {
-            if entry.expanded {
-                self.collapse_entry(self.explorer_selected);
-            } else {
-                self.expand_entry(self.explorer_selected);
-            }
-        } else {
-            self.push_file_to_tabs(&entry.path);
-        }
-    }
-
-    fn expand_entry(&mut self, index: usize) {
-        let (path, depth) = {
-            let entry = &self.explorer_entries[index];
-            (entry.path.clone(), entry.depth)
-        };
-
-        let children = Self::read_dir_sorted(&path, depth + 1);
-
-        self.explorer_entries[index].expanded = true;
-        self.explorer_entries.splice(index + 1..index + 1, children);
-    }
-
-    fn collapse_entry(&mut self, index: usize) {
-        let depth = self.explorer_entries[index].depth;
-
-        let end = self.explorer_entries[index + 1..]
-            .iter()
-            .position(|e| e.depth <= depth)
-            .map(|offset| index + 1 + offset)
-            .unwrap_or(self.explorer_entries.len());
-
-        self.explorer_entries.drain(index + 1..end);
-        self.explorer_entries[index].expanded = false;
-
-        self.explorer_selected = self
-            .explorer_selected
-            .min(self.explorer_entries.len().saturating_sub(1));
-    }
-
     pub fn icon_for(path: &Path, is_dir: bool) -> &str {
         if is_dir {
             return "󰉋";
@@ -169,17 +180,6 @@ impl App {
             Some("lock") => "󰌾",
             Some("gitignore") => "",
             _ => "󰈔",
-        }
-    }
-
-    pub fn toggle_explorer(&mut self) {
-        if self.show_explorer == false {
-            self.show_explorer = true;
-            self.refresh_explorer();
-            self.show_status("Opened Explorer".to_string());
-        } else {
-            self.show_explorer = false;
-            self.show_status("Closed Explorer".to_string());
         }
     }
 

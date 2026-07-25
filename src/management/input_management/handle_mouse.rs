@@ -1,6 +1,6 @@
 use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 
-use crate::app::App;
+use crate::{app::App, management::Selection};
 
 impl App {
     pub fn handle_mouse(&mut self, mouse: MouseEvent) {
@@ -15,17 +15,22 @@ impl App {
                 {
                     self.start_entry_drag(mouse);
                 } else if Self::point_in_rect(mouse.column, mouse.row, self.editor_area.get()) {
+                    self.selection = None;
                     self.move_cursor_to_mouse(mouse.column, mouse.row);
                 }
             }
+
             MouseEventKind::Drag(MouseButton::Left) => {
                 self.hover = None;
                 if self.dragging_tab.is_some() {
                     self.update_tab_drag(mouse);
                 } else if self.dragging_entry.is_some() {
                     self.update_entry_drag(mouse);
+                } else {
+                    self.drag_select(mouse.column, mouse.row);
                 }
             }
+
             MouseEventKind::Up(MouseButton::Left) => {
                 self.hover = None;
                 if self.dragging_tab.is_some() {
@@ -85,5 +90,36 @@ impl App {
 
         self.cursor.y = line_index;
         self.cursor.x = byte_index;
+    }
+
+    fn drag_select(&mut self, column: u16, row: u16) {
+        let area = self.editor_area.get();
+
+        let started_in_editor = self.selection.is_some() || Self::point_in_rect(column, row, area);
+        if !started_in_editor {
+            return;
+        }
+
+        if self.selection.is_none() {
+            self.selection = Some(Selection {
+                anchor: (self.cursor.x, self.cursor.y),
+            });
+        }
+
+        if row < area.y {
+            self.scroll_y = self.scroll_y.saturating_sub(1);
+        } else if row >= area.y + area.height {
+            let max_scroll = self
+                .document
+                .lines
+                .len()
+                .saturating_sub(self.viewport_height.get());
+            self.scroll_y = (self.scroll_y + 1).min(max_scroll);
+        }
+
+        let clamped_row = row.clamp(area.y, area.y + area.height.saturating_sub(1));
+        let clamped_col = column.max(area.x + self.number_col_width);
+
+        self.move_cursor_to_mouse(clamped_col, clamped_row);
     }
 }
