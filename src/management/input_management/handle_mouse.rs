@@ -20,6 +20,15 @@ impl App {
                 }
             }
 
+            MouseEventKind::Down(MouseButton::Right) => {
+                if self.show_explorer
+                    && Self::point_in_rect(mouse.column, mouse.row, self.explorer_area.get())
+                {
+                    // TODO: Implement Context Menu
+                    self.show_explorer = false;
+                }
+            }
+
             MouseEventKind::Drag(MouseButton::Left) => {
                 self.hover = None;
                 if self.dragging_tab.is_some() {
