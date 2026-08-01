@@ -59,6 +59,7 @@ pub struct App {
     pub entry_drag_target: Option<usize>,
     pub pending_quit_after_save: bool,
     pub show_explorer_context_menu: bool,
+    pub context_menu_pos: Option<(u16, u16)>,
     pub mouse_x: u16,
     pub mouse_y: u16,
     pub exit: bool,
@@ -107,6 +108,8 @@ impl Default for App {
             show_explorer_context_menu: false,
             clipboard: arboard::Clipboard::new().ok(),
             selection: None,
+
+            context_menu_pos: None,
 
             mouse_x: 0,
             mouse_y: 0,

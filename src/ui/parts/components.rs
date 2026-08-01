@@ -193,7 +193,10 @@ impl App {
     }
 
     pub fn render_context_menu(&self, area: Rect, buf: &mut Buffer) {
-        let popup_area = rect_at_mouse(self.mouse_x, self.mouse_y, 40, 5, area);
+        let Some((x, y)) = self.context_menu_pos else {
+            return;
+        };
+        let popup_area = rect_at_mouse(x, y, 40, 5, area);
 
         Clear.render(popup_area, buf);
 

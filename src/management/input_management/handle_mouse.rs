@@ -12,7 +12,9 @@ impl App {
             MouseEventKind::Moved => self.request_hover_at(mouse.column, mouse.row),
             MouseEventKind::Down(MouseButton::Left) => {
                 // self.hover = None;
-                if Self::point_in_rect(mouse.column, mouse.row, self.tabs_area.get()) {
+                if self.show_explorer_context_menu {
+                    self.show_explorer_context_menu = false;
+                } else if Self::point_in_rect(mouse.column, mouse.row, self.tabs_area.get()) {
                     self.start_tab_drag(mouse);
                 } else if self.show_explorer
                     && Self::point_in_rect(mouse.column, mouse.row, self.explorer_area.get())
@@ -29,8 +31,13 @@ impl App {
                 if self.show_explorer
                     && Self::point_in_rect(mouse.column, mouse.row, self.explorer_area.get())
                 {
-                    // TODO: Implement Context Menu
-                    self.show_explorer_context_menu = true;
+                    if self.show_explorer_context_menu {
+                        self.show_explorer_context_menu = false;
+                        self.context_menu_pos = None;
+                    } else {
+                        self.show_explorer_context_menu = true;
+                        self.context_menu_pos = Some((mouse.column, mouse.row));
+                    }
                 }
             }
 
