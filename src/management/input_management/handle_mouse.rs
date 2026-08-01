@@ -26,8 +26,7 @@ impl App {
                 }
             }
 
-            MouseEventKind::Up(MouseButton::Right) => {
-                // self.hover = None;
+            MouseEventKind::Down(MouseButton::Right) => {
                 if self.show_explorer
                     && Self::point_in_rect(mouse.column, mouse.row, self.explorer_area.get())
                 {
@@ -35,6 +34,13 @@ impl App {
                         self.show_explorer_context_menu = false;
                         self.context_menu_pos = None;
                     } else {
+                        let area = self.explorer_area.get();
+                        if mouse.row >= area.y {
+                            let row = (mouse.row - area.y) as usize;
+                            if row < self.explorer_entries.len() {
+                                self.explorer_selected = row;
+                            }
+                        }
                         self.show_explorer_context_menu = true;
                         self.context_menu_pos = Some((mouse.column, mouse.row));
                     }
