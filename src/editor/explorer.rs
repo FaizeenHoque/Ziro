@@ -30,6 +30,8 @@ impl App {
         }
     }
 
+    pub fn handle_context(&mut self, mouse: MouseEvent) {}
+
     pub fn start_entry_drag(&mut self, mouse: MouseEvent) {
         let area = self.explorer_area.get();
         if mouse.row < area.y {

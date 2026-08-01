@@ -58,6 +58,9 @@ pub struct App {
     pub dragging_entry: Option<usize>,
     pub entry_drag_target: Option<usize>,
     pub pending_quit_after_save: bool,
+    pub show_explorer_context_menu: bool,
+    pub mouse_x: u16,
+    pub mouse_y: u16,
     pub exit: bool,
 }
 
@@ -101,9 +104,12 @@ impl Default for App {
             hover_anchor: None,
             hover_pending: None,
             last_line_count,
-
+            show_explorer_context_menu: false,
             clipboard: arboard::Clipboard::new().ok(),
             selection: None,
+
+            mouse_x: 0,
+            mouse_y: 0,
 
             current_file: String::new(),
             highlighter: Highlighter::new(),

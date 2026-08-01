@@ -48,3 +48,25 @@ pub fn centered_rect(width: u16, height: u16, area: Rect) -> Rect {
         height: height.min(area.height),
     }
 }
+
+pub fn rect_at_mouse(mouse_x: u16, mouse_y: u16, width: u16, height: u16, area: Rect) -> Rect {
+    // Prevent the menu from bleeding off the right side of the screen
+    let x = if mouse_x + width > area.width {
+        area.width.saturating_sub(width)
+    } else {
+        mouse_x
+    };
+
+    let y = if mouse_y + height > area.height {
+        area.height.saturating_sub(height)
+    } else {
+        mouse_y
+    };
+
+    Rect {
+        x,
+        y,
+        width: width.min(area.width),
+        height: height.min(area.height),
+    }
+}

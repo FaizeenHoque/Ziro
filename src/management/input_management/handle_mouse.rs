@@ -5,6 +5,9 @@ use crate::{app::App, management::Selection};
 impl App {
     pub fn handle_mouse(&mut self, mouse: MouseEvent) {
         self.hover = None;
+        self.mouse_x = mouse.column;
+        self.mouse_y = mouse.row;
+
         match mouse.kind {
             MouseEventKind::Moved => self.request_hover_at(mouse.column, mouse.row),
             MouseEventKind::Down(MouseButton::Left) => {
@@ -21,13 +24,13 @@ impl App {
                 }
             }
 
-            MouseEventKind::Down(MouseButton::Right) => {
+            MouseEventKind::Up(MouseButton::Right) => {
                 // self.hover = None;
                 if self.show_explorer
                     && Self::point_in_rect(mouse.column, mouse.row, self.explorer_area.get())
                 {
                     // TODO: Implement Context Menu
-                    self.show_explorer = false;
+                    self.show_explorer_context_menu = true;
                 }
             }
 

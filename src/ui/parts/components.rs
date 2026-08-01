@@ -1,12 +1,15 @@
 use ratatui::{
     buffer::Buffer,
-    layout::{Constraint, Layout, Rect},
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Widget},
+    widgets::{Block, Borders, Clear, Paragraph, Widget},
 };
 
-use crate::{app::App, ui::render_language_overlays};
+use crate::{
+    app::App,
+    ui::{centered_rect, rect_at_mouse, render_language_overlays},
+};
 
 impl App {
     pub fn render_top_titlebar(&self, area: Rect, buf: &mut Buffer) {
@@ -187,6 +190,37 @@ impl App {
 
         // Call LSP layers to draw on top of content bounds
         render_language_overlays(self, horizontal[1], buf);
+    }
+
+    pub fn render_context_menu(&self, area: Rect, buf: &mut Buffer) {
+        let popup_area = rect_at_mouse(self.mouse_x, self.mouse_y, 40, 5, area);
+
+        Clear.render(popup_area, buf);
+
+        Block::new()
+            .title(" More... ")
+            .borders(Borders::ALL)
+            .style(
+                Style::new()
+                    .bg(self.theme.bg_popup)
+                    .fg(self.theme.fg_default),
+            )
+            .render(popup_area, buf);
+
+        let inner = Rect {
+            x: popup_area.x + 1,
+            y: popup_area.y + 2,
+            width: popup_area.width - 2,
+            height: 1,
+        };
+
+        Paragraph::new(self.filename_input.as_str())
+            .style(
+                Style::new()
+                    .bg(self.theme.bg_popup)
+                    .fg(self.theme.fg_default),
+            )
+            .render(inner, buf);
     }
 
     pub fn apply_selection_highlight<'a>(

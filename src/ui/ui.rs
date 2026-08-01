@@ -70,5 +70,9 @@ impl Widget for &mut App {
         if self.filename_prompt {
             self.filename_prompt(area, buf);
         }
+
+        if self.show_explorer_context_menu {
+            self.render_context_menu(area, buf);
+        }
     }
 }
