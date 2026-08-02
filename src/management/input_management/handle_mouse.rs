@@ -13,8 +13,25 @@ impl App {
             MouseEventKind::Down(MouseButton::Left) => {
                 // self.hover = None;
                 if self.show_explorer_context_menu {
+                    let area = self.viewport_area.get();
+                    let handled = if let Some(menu) = self.explorer_context_menu.take() {
+                        let handled = menu.activate(self, area, mouse.column, mouse.row);
+                        self.explorer_context_menu = Some(menu);
+                        handled
+                    } else {
+                        false
+                    };
+
                     self.show_explorer_context_menu = false;
-                } else if Self::point_in_rect(mouse.column, mouse.row, self.tabs_area.get()) {
+                    self.context_menu_pos = None;
+                    self.explorer_context_menu = None;
+
+                    if handled {
+                        return;
+                    }
+                }
+
+                if Self::point_in_rect(mouse.column, mouse.row, self.tabs_area.get()) {
                     self.start_tab_drag(mouse);
                 } else if self.show_explorer
                     && Self::point_in_rect(mouse.column, mouse.row, self.explorer_area.get())

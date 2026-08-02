@@ -12,7 +12,7 @@ use ratatui::{DefaultTerminal, Frame};
 use crate::lsp::protocol::{CompletionItem, Diagnostic, Hover, SemanticToken};
 use crate::lsp::{LspSession, LspStatus};
 use crate::management::{Selection, TabItem, UndoState};
-use crate::ui::Theme;
+use crate::ui::{ContextMenu, Theme};
 use crate::{editor::*, ui};
 
 pub struct App {
@@ -60,6 +60,8 @@ pub struct App {
     pub pending_quit_after_save: bool,
     pub show_explorer_context_menu: bool,
     pub context_menu_pos: Option<(u16, u16)>,
+    pub explorer_context_menu: Option<ContextMenu>,
+    pub viewport_area: Cell<Rect>,
     pub mouse_x: u16,
     pub mouse_y: u16,
     pub exit: bool,
@@ -110,6 +112,8 @@ impl Default for App {
             selection: None,
 
             context_menu_pos: None,
+            explorer_context_menu: None,
+            viewport_area: Cell::new(Rect::default()),
 
             mouse_x: 0,
             mouse_y: 0,
@@ -181,6 +185,7 @@ impl App {
 
     // misc
     fn draw(&mut self, frame: &mut Frame) {
+        self.viewport_area.set(frame.area());
         ui::draw(frame, self);
         let area = frame.area();
 

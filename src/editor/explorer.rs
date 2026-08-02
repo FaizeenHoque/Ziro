@@ -53,7 +53,10 @@ impl App {
             // ContextOption::new("Copy Path".to_string()),
             // ContextOption::new("Reveal in File Manager".to_string()),
         ]);
-        ContextMenu::render(self, area, buf, &explorer_menu);
+        self.explorer_context_menu = Some(explorer_menu);
+        if let Some(menu) = self.explorer_context_menu.as_ref() {
+            ContextMenu::render(self, area, buf, menu);
+        }
     }
 
     pub fn start_entry_drag(&mut self, mouse: MouseEvent) {
