@@ -12,14 +12,16 @@ pub struct ContextMenu {
 }
 pub struct ContextOption {
     pub name: String,
-    // pub operation: fn(),
+    pub operation: fn(&mut App),
 }
 
 impl ContextOption {
-    // pub fn new(name: String, operation: fn()) -> Self {
-    pub fn new(name: String) -> Self {
-        // Self { name, operation }
-        Self { name }
+    pub fn new(name: String, operation: fn(&mut App)) -> Self {
+        Self { name, operation }
+    }
+
+    pub fn perform(&self, app: &mut App) {
+        (self.operation)(app);
     }
 }
 
