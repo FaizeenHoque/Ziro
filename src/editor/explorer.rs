@@ -1,8 +1,12 @@
 use std::path::{Path, PathBuf};
 
 use crossterm::event::MouseEvent;
+use ratatui::{buffer::Buffer, layout::Rect};
 
-use crate::app::App;
+use crate::{
+    app::App,
+    ui::{ContextMenu, ContextOption},
+};
 
 #[derive(Debug, Clone)]
 pub struct FileEntry {
@@ -30,7 +34,23 @@ impl App {
         }
     }
 
-    pub fn handle_context(&mut self, mouse: MouseEvent) {}
+    pub fn open_explorer_context(&mut self, area: Rect, buf: &mut Buffer) {
+        let explorer_menu = ContextMenu::new(vec![
+            ContextOption::new("Open".to_string()),
+            ContextOption::new("Open in New Tab".to_string()),
+            ContextOption::new("Rename".to_string()),
+            ContextOption::new("Copy".to_string()),
+            ContextOption::new("Cut".to_string()),
+            ContextOption::new("Paste".to_string()),
+            ContextOption::new("Duplicate".to_string()),
+            ContextOption::new("Delete".to_string()),
+            ContextOption::new("New File".to_string()),
+            ContextOption::new("New Folder".to_string()),
+            ContextOption::new("Copy Path".to_string()),
+            ContextOption::new("Reveal in File Manager".to_string()),
+        ]);
+        ContextMenu::render(self, area, buf, &explorer_menu);
+    }
 
     pub fn start_entry_drag(&mut self, mouse: MouseEvent) {
         let area = self.explorer_area.get();
