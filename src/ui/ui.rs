@@ -72,7 +72,21 @@ impl Widget for &mut App {
         }
 
         if self.show_explorer_context_menu {
-            self.render_context_menu(area, buf);
+            let explorer_menu = ContextMenu::new(vec![
+                ContextOption::new("Open".to_string()),
+                ContextOption::new("Open in New Tab".to_string()),
+                ContextOption::new("Rename".to_string()),
+                ContextOption::new("Copy".to_string()),
+                ContextOption::new("Cut".to_string()),
+                ContextOption::new("Paste".to_string()),
+                ContextOption::new("Duplicate".to_string()),
+                ContextOption::new("Delete".to_string()),
+                ContextOption::new("New File".to_string()),
+                ContextOption::new("New Folder".to_string()),
+                ContextOption::new("Copy Path".to_string()),
+                ContextOption::new("Reveal in File Manager".to_string()),
+            ]);
+            ContextMenu::render(self, area, buf, &explorer_menu);
         }
     }
 }

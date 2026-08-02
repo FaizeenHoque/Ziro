@@ -192,40 +192,6 @@ impl App {
         render_language_overlays(self, horizontal[1], buf);
     }
 
-    pub fn render_context_menu(&self, area: Rect, buf: &mut Buffer) {
-        let Some((x, y)) = self.context_menu_pos else {
-            return;
-        };
-        let popup_area = rect_at_mouse(x, y, 40, 5, area);
-
-        Clear.render(popup_area, buf);
-
-        Block::new()
-            .title(" More... ")
-            .borders(Borders::ALL)
-            .style(
-                Style::new()
-                    .bg(self.theme.bg_popup)
-                    .fg(self.theme.fg_default),
-            )
-            .render(popup_area, buf);
-
-        let inner = Rect {
-            x: popup_area.x + 1,
-            y: popup_area.y + 2,
-            width: popup_area.width - 2,
-            height: 1,
-        };
-
-        Paragraph::new(self.filename_input.as_str())
-            .style(
-                Style::new()
-                    .bg(self.theme.bg_popup)
-                    .fg(self.theme.fg_default),
-            )
-            .render(inner, buf);
-    }
-
     pub fn apply_selection_highlight<'a>(
         spans: Vec<Span<'a>>,
         sel_start: usize,
